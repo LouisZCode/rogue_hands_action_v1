@@ -13,7 +13,3 @@ config_version=5
 config/name="rogue_hands_actionbased"
 config/features=PackedStringArray("4.4", "Mobile")
 config/icon="res://icon.svg"
-
-[rendering]
-
-renderer/rendering_method="mobile"
