@@ -1,0 +1,99 @@
+extends Node
+class_name GameManager
+
+# References
+@onready var player_health_bar: ProgressBar = $"../UILayer/HealthUI/PlayerHealth"
+@onready var stance_indicator: Label = $"../UILayer/HealthUI/StanceIndicator"
+@onready var player: Player = $"../GameLayer/Player"
+@onready var enemy: Enemy = $"../GameLayer/Enemy"
+
+# Game state
+var score: int = 0
+
+func _ready():
+	# Connect player signals
+	if player:
+		player.health_changed.connect(_on_player_health_changed)
+		player.stance_changed.connect(_on_player_stance_changed)
+		player.player_attack.connect(_on_player_attack)
+	
+	# Connect enemy signals  
+	if enemy:
+		enemy.enemy_died.connect(_on_enemy_died)
+		enemy.enemy_attack.connect(_on_enemy_attack)
+	
+	# Initialize UI
+	update_player_health_ui(player.current_health if player else 100)
+	update_stance_ui(player.current_stance if player else Player.Stance.ROCK)
+
+func _on_player_health_changed(new_health: int):
+	update_player_health_ui(new_health)
+
+func _on_player_stance_changed(new_stance: Player.Stance):
+	update_stance_ui(new_stance)
+
+func _on_player_attack(attacker_stance: Player.Stance, attack_position: Vector2):
+	print("Player attacks with: ", Player.Stance.keys()[attacker_stance])
+
+func _on_enemy_died():
+	score += 1
+	print("Enemy defeated! Score: ", score)
+	# Spawn new enemy after a delay
+	var timer = create_tween()
+	timer.tween_callback(spawn_new_enemy).set_delay(2.0)
+
+func _on_enemy_attack(attacker_stance: Enemy.Stance, attack_position: Vector2):
+	print("Enemy attacks with: ", Enemy.Stance.keys()[attacker_stance])
+
+func update_player_health_ui(health: int):
+	if player_health_bar:
+		var health_percent = float(health) / 100.0 * 100.0
+		player_health_bar.value = health_percent
+		
+		# Change health bar color
+		if health_percent > 66:
+			player_health_bar.modulate = Color.GREEN
+		elif health_percent > 33:
+			player_health_bar.modulate = Color.YELLOW
+		else:
+			player_health_bar.modulate = Color.RED
+
+func update_stance_ui(stance: Player.Stance):
+	if stance_indicator:
+		match stance:
+			Player.Stance.ROCK:
+				stance_indicator.text = "ROCK ✊"
+				stance_indicator.modulate = Color.GRAY
+			Player.Stance.PAPER:
+				stance_indicator.text = "PAPER ✋"  
+				stance_indicator.modulate = Color.WHITE
+			Player.Stance.SCISSORS:
+				stance_indicator.text = "SCISSORS ✌️"
+				stance_indicator.modulate = Color.YELLOW
+
+func spawn_new_enemy():
+	# Create new enemy at random position
+	var enemy_scene = preload("res://scenes/Enemy.tscn")
+	var new_enemy = enemy_scene.instantiate()
+	
+	# Random spawn position around the edges
+	var spawn_positions = [
+		Vector2(-300, -200), Vector2(300, 200),
+		Vector2(-300, 200), Vector2(300, -200)
+	]
+	new_enemy.global_position = spawn_positions[randi() % spawn_positions.size()]
+	
+	# Add to game layer
+	$"../GameLayer".add_child(new_enemy)
+	
+	# Connect signals
+	new_enemy.enemy_died.connect(_on_enemy_died)
+	new_enemy.enemy_attack.connect(_on_enemy_attack)
+	
+	# Update enemy reference
+	enemy = new_enemy
+
+func game_over():
+	print("Game Over! Final Score: ", score)
+	# Handle game over (show menu, restart, etc.)
+	get_tree().reload_current_scene()

@@ -1,0 +1,29 @@
+[gd_scene load_steps=3 format=3 uid="uid://be4bx5ny1xrdv"]
+
+[sub_resource type="Gradient" id="Gradient_1"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_1"]
+gradient = SubResource("Gradient_1")
+
+[node name="GestureParticles" type="GPUParticles2D"]
+emitting = false
+amount = 30
+lifetime = 0.8
+one_shot = true
+explosiveness = 1.0
+texture = SubResource("GradientTexture1D_1")
+emission = {
+  "amount": 30,
+  "amount_random": 0.1
+}
+direction = Vector3(0, 0, 0)
+spread = 360.0
+initial_velocity_min = 30.0
+initial_velocity_max = 80.0
+angular_velocity_min = -90.0
+angular_velocity_max = 90.0
+gravity = Vector3(0, 20, 0)
+scale_min = 0.3
+scale_max = 0.8
+color = Color(0.8, 0.8, 1, 1)
