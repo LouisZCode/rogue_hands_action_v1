@@ -4,7 +4,8 @@
       "WebFetch(domain:docs.godotengine.org)",
       "Bash(mkdir:*)",
       "Bash(find:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(godot:*)"
     ],
     "deny": []
   }

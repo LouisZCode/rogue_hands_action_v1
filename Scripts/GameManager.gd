@@ -61,6 +61,9 @@ func update_player_health_ui(health: int):
 func update_stance_ui(stance: Player.Stance):
 	if stance_indicator:
 		match stance:
+			Player.Stance.NEUTRAL:
+				stance_indicator.text = "NEUTRAL 👤"
+				stance_indicator.modulate = Color.LIGHT_BLUE
 			Player.Stance.ROCK:
 				stance_indicator.text = "ROCK ✊"
 				stance_indicator.modulate = Color.GRAY

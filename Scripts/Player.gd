@@ -5,8 +5,8 @@ class_name Player
 @export var speed: float = 200.0
 
 # Combat variables
-enum Stance { ROCK, PAPER, SCISSORS }
-var current_stance: Stance = Stance.ROCK
+enum Stance { NEUTRAL, ROCK, PAPER, SCISSORS }
+var current_stance: Stance = Stance.NEUTRAL
 var max_health: int = 100
 var current_health: int = 100
 
@@ -17,12 +17,14 @@ var current_health: int = 100
 
 # Stance colors and symbols
 var stance_colors = {
+	Stance.NEUTRAL: Color.LIGHT_BLUE,
 	Stance.ROCK: Color.GRAY,
 	Stance.PAPER: Color.WHITE, 
 	Stance.SCISSORS: Color.YELLOW
 }
 
 var stance_symbols = {
+	Stance.NEUTRAL: "👤",
 	Stance.ROCK: "✊",
 	Stance.PAPER: "✋",
 	Stance.SCISSORS: "✌️"
@@ -63,16 +65,22 @@ func handle_movement(delta):
 	move_and_slide()
 
 func handle_input():
-	# Stance selection
-	if Input.is_action_just_pressed("gesture_rock"):
-		change_stance(Stance.ROCK)
-	elif Input.is_action_just_pressed("gesture_paper"):
-		change_stance(Stance.PAPER)
-	elif Input.is_action_just_pressed("gesture_scissors"):  
-		change_stance(Stance.SCISSORS)
+	# Stance selection - hold keys to maintain stance
+	var new_stance = Stance.NEUTRAL
 	
-	# Attack
-	if Input.is_action_just_pressed("attack"):
+	if Input.is_action_pressed("gesture_rock"):
+		new_stance = Stance.ROCK
+	elif Input.is_action_pressed("gesture_paper"):
+		new_stance = Stance.PAPER
+	elif Input.is_action_pressed("gesture_scissors"):  
+		new_stance = Stance.SCISSORS
+	
+	# Only change stance if it's different
+	if new_stance != current_stance:
+		change_stance(new_stance)
+	
+	# Attack - only allow if not in neutral stance
+	if Input.is_action_just_pressed("attack") and current_stance != Stance.NEUTRAL:
 		perform_attack()
 
 func change_stance(new_stance: Stance):
@@ -96,6 +104,10 @@ func perform_attack():
 			body.take_damage_from_player(current_stance, global_position)
 
 func take_damage(amount: int):
+	# Players in neutral stance cannot take damage
+	if current_stance == Stance.NEUTRAL:
+		return
+		
 	current_health = max(0, current_health - amount)
 	health_changed.emit(current_health)
 	

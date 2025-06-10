@@ -7,7 +7,7 @@ class_name Enemy
 @export var attack_range: float = 50.0
 
 # Combat variables  
-enum Stance { ROCK, PAPER, SCISSORS }
+enum Stance { NEUTRAL, ROCK, PAPER, SCISSORS }
 var current_stance: Stance = Stance.ROCK  # Enemy only uses Rock
 var max_health: int = 60
 var current_health: int = 60
@@ -28,12 +28,14 @@ var attack_timer: float = 0.0
 
 # Stance colors and symbols (enemy only uses Rock)
 var stance_colors = {
+	Stance.NEUTRAL: Color.LIGHT_GRAY,
 	Stance.ROCK: Color.DARK_RED,
 	Stance.PAPER: Color.PINK,
 	Stance.SCISSORS: Color.ORANGE
 }
 
 var stance_symbols = {
+	Stance.NEUTRAL: "👤",
 	Stance.ROCK: "✊",
 	Stance.PAPER: "✋", 
 	Stance.SCISSORS: "✌️"
@@ -92,13 +94,11 @@ func perform_attack():
 		# Emit attack signal
 		enemy_attack.emit(current_stance, global_position)
 		
-		# Deal damage to player if in range
+		# Deal damage to player if in range and player is not in neutral stance
 		var distance = global_position.distance_to(player_ref.global_position)
-		if distance <= attack_range:
-			# Combat resolution: Enemy always uses Rock
-			# Convert player stance to enemy stance enum for comparison
-			var player_stance_as_enemy = current_stance  # Enemy is always Rock
-			var damage = calculate_damage(current_stance, current_stance)  # Simplified for now
+		if distance <= attack_range and player_ref.current_stance != Player.Stance.NEUTRAL:
+			# Enemy attacks with fixed damage based on rock-paper-scissors logic
+			var damage = calculate_combat_damage(current_stance, player_ref.current_stance)
 			if damage > 0:
 				player_ref.take_damage(damage)
 			
@@ -118,33 +118,62 @@ func calculate_damage(attacker_stance: Stance, defender_stance: Stance) -> int:
 	else:
 		return 5   # Lose damage
 
+func calculate_combat_damage(enemy_stance: Stance, player_stance) -> int:
+	# Enemy attacks player - convert player stance for comparison
+	# Enemy enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
+	# Player enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
+	var player_stance_int = int(player_stance)
+	var enemy_stance_int = int(enemy_stance)  # Enemy uses Rock (1)
+	
+	# Player in neutral cannot be damaged (handled elsewhere but double-check)
+	if player_stance_int == 0:
+		return 0
+	
+	# Combat logic: Enemy Rock vs Player stance
+	if enemy_stance_int == player_stance_int:  # Tie
+		return 10
+	elif (enemy_stance_int == 1 and player_stance_int == 3):  # Rock beats Scissors
+		return 30  # Enemy wins
+	elif (enemy_stance_int == 2 and player_stance_int == 1):  # Paper beats Rock
+		return 30  # Enemy wins
+	elif (enemy_stance_int == 3 and player_stance_int == 2):  # Scissors beats Paper
+		return 30  # Enemy wins
+	else:
+		return 5   # Enemy loses
+
 func take_damage_from_player(player_stance, attack_position: Vector2):
 	# Convert player stance to comparable format
-	var enemy_stance_equivalent = current_stance  # Enemy is always Rock
 	var damage = 0
+	var result = ""
 	
 	# Manual Rock-Paper-Scissors logic using integers
-	var player_stance_int = int(player_stance)  # 0=Rock, 1=Paper, 2=Scissors
-	var enemy_stance_int = 0  # Enemy always uses Rock
+	# Player enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
+	# Enemy enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
+	var player_stance_int = int(player_stance)
+	var enemy_stance_int = 1  # Enemy always uses Rock (index 1 in new enum)
 	
-	if player_stance_int == enemy_stance_int:
+	# Players in neutral stance cannot attack (this shouldn't happen due to attack restrictions)
+	if player_stance_int == 0:  # NEUTRAL
+		damage = 0
+		result = "NO DAMAGE - NEUTRAL STANCE"
+	elif player_stance_int == enemy_stance_int:  # Both Rock
 		damage = 10  # Tie
-		var result = "TIE"
-	elif (player_stance_int == 1 and enemy_stance_int == 0):  # Paper beats Rock
+		result = "TIE"
+	elif (player_stance_int == 2 and enemy_stance_int == 1):  # Paper beats Rock
 		damage = 30  # Player wins
-		var result = "PLAYER WINS"
-	elif (player_stance_int == 0 and enemy_stance_int == 2):  # Rock beats Scissors
+		result = "PLAYER WINS"
+	elif (player_stance_int == 1 and enemy_stance_int == 3):  # Rock beats Scissors
 		damage = 30  # Player wins
-		var result = "PLAYER WINS"
-	elif (player_stance_int == 2 and enemy_stance_int == 1):  # Scissors beats Paper
+		result = "PLAYER WINS"
+	elif (player_stance_int == 3 and enemy_stance_int == 2):  # Scissors beats Paper
 		damage = 30  # Player wins  
-		var result = "PLAYER WINS"
+		result = "PLAYER WINS"
 	else:
 		damage = 5   # Player loses
-		var result = "ENEMY WINS"
+		result = "ENEMY WINS"
 	
 	take_damage(damage)
-	print("Combat: Player Stance ", player_stance_int, " vs Enemy Rock - Damage: ", damage)
+	print("Combat: Player Stance ", player_stance_int, " vs Enemy Rock - Damage: ", damage, " - ", result)
 
 func take_damage(amount: int):
 	current_health = max(0, current_health - amount)
