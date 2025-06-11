@@ -17,8 +17,8 @@ var is_dashing: bool = false
 var dash_direction: Vector2 = Vector2.ZERO
 var dash_timer: float = 0.0
 
-# Attack cooldown
-@export var attack_cooldown: float = 0.3
+# Attack cooldown - increased to 1 second for balance
+@export var attack_cooldown: float = 1.0
 var attack_cooldown_timer: float = 0.0
 
 # References
@@ -44,6 +44,7 @@ var stance_symbols = {
 signal health_changed(new_health: int)
 signal stance_changed(new_stance: Stance)
 signal player_attack(attacker_stance: Stance, attack_position: Vector2)
+signal attack_cooldown_changed(current_cooldown: float, max_cooldown: float)
 
 func _ready():
 	update_stance_visual()
@@ -56,6 +57,7 @@ func _physics_process(delta):
 	# Update attack cooldown
 	if attack_cooldown_timer > 0:
 		attack_cooldown_timer -= delta
+		attack_cooldown_changed.emit(attack_cooldown_timer, attack_cooldown)
 	
 	# Check for attack hits during dash
 	if is_dashing:
@@ -68,6 +70,8 @@ func handle_movement(delta):
 		if dash_timer <= 0:
 			is_dashing = false
 			velocity = Vector2.ZERO
+			# Auto-return to neutral stance after dash
+			change_stance(Stance.NEUTRAL)
 		else:
 			velocity = dash_direction * dash_speed
 	else:
@@ -158,10 +162,15 @@ func perform_dash_attack(direction: Vector2):
 	var dash_color = stance_colors[current_stance].lerp(Color.WHITE, 0.5)
 	sprite.modulate = dash_color
 	
-	# Reset color after dash
+	# Reset color after dash and auto-return to neutral
 	var tween = create_tween()
 	tween.tween_interval(dash_duration)
 	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+	tween.tween_callback(func(): 
+		current_stance = Stance.NEUTRAL
+		update_stance_visual()
+		stance_changed.emit(current_stance)
+	)
 	
 	# Emit signal with current stance and position
 	player_attack.emit(current_stance, global_position)

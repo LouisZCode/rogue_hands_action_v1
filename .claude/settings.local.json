@@ -5,7 +5,8 @@
       "Bash(mkdir:*)",
       "Bash(find:*)",
       "Bash(ls:*)",
-      "Bash(godot:*)"
+      "Bash(godot:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

@@ -4,6 +4,8 @@ class_name GameManager
 # References
 @onready var player_health_bar: ProgressBar = $"../UILayer/HealthUI/PlayerHealth"
 @onready var stance_indicator: Label = $"../UILayer/HealthUI/StanceIndicator"
+@onready var attack_cooldown_bar: ProgressBar = $"../UILayer/HealthUI/AttackCooldownBar"
+@onready var cooldown_label: Label = $"../UILayer/HealthUI/CooldownLabel"
 @onready var player: Player = $"../GameLayer/Player"
 @onready var enemy: Enemy = $"../GameLayer/Enemy"
 
@@ -16,6 +18,7 @@ func _ready():
 		player.health_changed.connect(_on_player_health_changed)
 		player.stance_changed.connect(_on_player_stance_changed)
 		player.player_attack.connect(_on_player_attack)
+		player.attack_cooldown_changed.connect(_on_player_attack_cooldown_changed)
 	
 	# Connect enemy signals  
 	if enemy:
@@ -25,6 +28,7 @@ func _ready():
 	# Initialize UI
 	update_player_health_ui(player.current_health if player else 100)
 	update_stance_ui(player.current_stance if player else Player.Stance.ROCK)
+	update_attack_cooldown_ui(0.0, 1.0)  # Initialize cooldown bar
 
 func _on_player_health_changed(new_health: int):
 	update_player_health_ui(new_health)
@@ -34,6 +38,9 @@ func _on_player_stance_changed(new_stance: Player.Stance):
 
 func _on_player_attack(attacker_stance: Player.Stance, attack_position: Vector2):
 	print("Player attacks with: ", Player.Stance.keys()[attacker_stance])
+
+func _on_player_attack_cooldown_changed(current_cooldown: float, max_cooldown: float):
+	update_attack_cooldown_ui(current_cooldown, max_cooldown)
 
 func _on_enemy_died():
 	score += 1
@@ -73,6 +80,20 @@ func update_stance_ui(stance: Player.Stance):
 			Player.Stance.SCISSORS:
 				stance_indicator.text = "SCISSORS ✌️"
 				stance_indicator.modulate = Color.YELLOW
+
+func update_attack_cooldown_ui(current_cooldown: float, max_cooldown: float):
+	if attack_cooldown_bar and cooldown_label:
+		# Update progress bar (inverted - full bar means ready, empty means cooling down)
+		var progress = 1.0 - (current_cooldown / max_cooldown)
+		attack_cooldown_bar.value = progress
+		
+		# Update label and color
+		if current_cooldown <= 0:
+			cooldown_label.text = "Attack Ready"
+			attack_cooldown_bar.modulate = Color.GREEN
+		else:
+			cooldown_label.text = "Cooldown: %.1fs" % current_cooldown
+			attack_cooldown_bar.modulate = Color.RED
 
 func spawn_new_enemy():
 	# Create new enemy at random position

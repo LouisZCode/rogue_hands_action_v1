@@ -119,7 +119,7 @@ func calculate_damage(attacker_stance: Stance, defender_stance: Stance) -> int:
 		return 5   # Lose damage
 
 func calculate_combat_damage(enemy_stance: Stance, player_stance) -> int:
-	# Enemy attacks player - convert player stance for comparison
+	# Enemy attacks player - proper Rock-Paper-Scissors logic
 	# Enemy enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
 	# Player enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
 	var player_stance_int = int(player_stance)
@@ -130,47 +130,42 @@ func calculate_combat_damage(enemy_stance: Stance, player_stance) -> int:
 		return 0
 	
 	# Combat logic: Enemy Rock vs Player stance
-	if enemy_stance_int == player_stance_int:  # Tie
-		return 10
-	elif (enemy_stance_int == 1 and player_stance_int == 3):  # Rock beats Scissors
-		return 30  # Enemy wins
-	elif (enemy_stance_int == 2 and player_stance_int == 1):  # Paper beats Rock
-		return 30  # Enemy wins
-	elif (enemy_stance_int == 3 and player_stance_int == 2):  # Scissors beats Paper
-		return 30  # Enemy wins
+	if enemy_stance_int == player_stance_int:  # Tie (Rock vs Rock)
+		return 10  # Tie damage
+	elif (enemy_stance_int == 1 and player_stance_int == 3):  # Enemy Rock beats Player Scissors
+		return 30  # Enemy wins - player takes damage
+	elif (enemy_stance_int == 1 and player_stance_int == 2):  # Enemy Rock loses to Player Paper  
+		return 0   # Player wins - no damage to player
 	else:
-		return 5   # Enemy loses
+		return 5   # Default case
 
 func take_damage_from_player(player_stance, attack_position: Vector2):
 	# Convert player stance to comparable format
 	var damage = 0
 	var result = ""
 	
-	# Manual Rock-Paper-Scissors logic using integers
+	# Proper Rock-Paper-Scissors logic using integers
 	# Player enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
 	# Enemy enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
 	var player_stance_int = int(player_stance)
-	var enemy_stance_int = 1  # Enemy always uses Rock (index 1 in new enum)
+	var enemy_stance_int = 1  # Enemy always uses Rock (index 1 in enum)
 	
 	# Players in neutral stance cannot attack (this shouldn't happen due to attack restrictions)
 	if player_stance_int == 0:  # NEUTRAL
 		damage = 0
 		result = "NO DAMAGE - NEUTRAL STANCE"
-	elif player_stance_int == enemy_stance_int:  # Both Rock
+	elif player_stance_int == enemy_stance_int:  # Both Rock (Tie)
 		damage = 10  # Tie
-		result = "TIE"
-	elif (player_stance_int == 2 and enemy_stance_int == 1):  # Paper beats Rock
+		result = "TIE - ROCK vs ROCK"
+	elif (player_stance_int == 2 and enemy_stance_int == 1):  # Player Paper beats Enemy Rock
 		damage = 30  # Player wins
-		result = "PLAYER WINS"
-	elif (player_stance_int == 1 and enemy_stance_int == 3):  # Rock beats Scissors
-		damage = 30  # Player wins
-		result = "PLAYER WINS"
-	elif (player_stance_int == 3 and enemy_stance_int == 2):  # Scissors beats Paper
-		damage = 30  # Player wins  
-		result = "PLAYER WINS"
+		result = "PLAYER WINS - PAPER beats ROCK"
+	elif (player_stance_int == 3 and enemy_stance_int == 1):  # Player Scissors loses to Enemy Rock
+		damage = 5   # Player loses (reduced damage)
+		result = "PLAYER LOSES - ROCK beats SCISSORS"
 	else:
-		damage = 5   # Player loses
-		result = "ENEMY WINS"
+		damage = 5   # Default case
+		result = "UNKNOWN CASE"
 	
 	take_damage(damage)
 	print("Combat: Player Stance ", player_stance_int, " vs Enemy Rock - Damage: ", damage, " - ", result)
