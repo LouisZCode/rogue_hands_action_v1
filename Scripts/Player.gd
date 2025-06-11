@@ -183,17 +183,24 @@ func attack_during_dash():
 			body.take_damage_from_player(current_stance, global_position)
 
 func take_damage(amount: int):
-	# Players in neutral stance cannot take damage
+	# Players in neutral stance take reduced damage (25% of original damage)
+	var final_damage = amount
 	if current_stance == Stance.NEUTRAL:
-		return
+		final_damage = max(1, amount / 4)  # 25% damage, minimum 1
 		
-	current_health = max(0, current_health - amount)
+	current_health = max(0, current_health - final_damage)
 	health_changed.emit(current_health)
 	
-	# Visual feedback for taking damage
+	# Visual feedback for taking damage (different color for neutral stance)
 	var tween = create_tween()
-	tween.tween_property(sprite, "modulate", Color.RED, 0.1)
-	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+	if current_stance == Stance.NEUTRAL:
+		# Blue flash for reduced damage in neutral stance
+		tween.tween_property(sprite, "modulate", Color.CYAN, 0.1)
+		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+	else:
+		# Red flash for normal damage
+		tween.tween_property(sprite, "modulate", Color.RED, 0.1)
+		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 	
 	if current_health <= 0:
 		die()

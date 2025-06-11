@@ -71,6 +71,11 @@ func update_stance_ui(stance: Player.Stance):
 			Player.Stance.NEUTRAL:
 				stance_indicator.text = "NEUTRAL 👤"
 				stance_indicator.modulate = Color.LIGHT_BLUE
+				# Add subtle pulsing effect for neutral stance to show it's defensive
+				var tween = create_tween()
+				tween.set_loops()
+				tween.tween_property(stance_indicator, "modulate", Color.CYAN, 1.0)
+				tween.tween_property(stance_indicator, "modulate", Color.LIGHT_BLUE, 1.0)
 			Player.Stance.ROCK:
 				stance_indicator.text = "ROCK ✊"
 				stance_indicator.modulate = Color.GRAY
@@ -91,6 +96,10 @@ func update_attack_cooldown_ui(current_cooldown: float, max_cooldown: float):
 		if current_cooldown <= 0:
 			cooldown_label.text = "Attack Ready"
 			attack_cooldown_bar.modulate = Color.GREEN
+			# When cooldown completes and player is not in a stance, show neutral indicator
+			if player and player.current_stance != Player.Stance.NEUTRAL:
+				# Add visual indication that neutral stance is available
+				cooldown_label.text = "Attack Ready - Return to 👤 Neutral"
 		else:
 			cooldown_label.text = "Cooldown: %.1fs" % current_cooldown
 			attack_cooldown_bar.modulate = Color.RED
