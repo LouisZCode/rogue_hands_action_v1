@@ -90,6 +90,7 @@ func update_ai(delta):
 	if is_dashing:
 		return  # Don't update AI during dash
 		
+	# Note: All movement functions now enforce neutral stance restriction like player
 	match current_state:
 		AIState.IDLE:
 			velocity = Vector2.ZERO
@@ -151,6 +152,7 @@ func update_ai(delta):
 			velocity = Vector2.ZERO
 			# Stunned state handled by timer
 	
+	# Movement is now handled in handle_dash_movement() during dashes
 	if not is_dashing:
 		move_and_slide()
 
@@ -164,6 +166,11 @@ func observe_player():
 
 func position_tactically():
 	if player_ref:
+		# Only move if in neutral stance (like player)
+		if current_stance != Stance.NEUTRAL:
+			velocity = Vector2.ZERO
+			return
+			
 		var distance = global_position.distance_to(player_ref.global_position)
 		var direction = (player_ref.global_position - global_position).normalized()
 		
@@ -204,11 +211,21 @@ func select_tactical_stance():
 
 func chase_player():
 	if player_ref:
+		# Only move if in neutral stance (like player)
+		if current_stance != Stance.NEUTRAL:
+			velocity = Vector2.ZERO
+			return
+			
 		var direction = (player_ref.global_position - global_position).normalized()
 		velocity = direction * speed
 
 func retreat_from_player():
 	if player_ref:
+		# Only move if in neutral stance (like player)
+		if current_stance != Stance.NEUTRAL:
+			velocity = Vector2.ZERO
+			return
+			
 		var direction = (global_position - player_ref.global_position).normalized()
 		velocity = direction * speed * 0.8
 
@@ -225,6 +242,9 @@ func handle_dash_movement(delta):
 			retreat_timer = 1.0
 		else:
 			velocity = dash_direction * dash_speed
+			
+		# CRITICAL FIX: Apply movement during dash
+		move_and_slide()
 			
 		# Check for player hits during dash
 		attack_during_dash()
@@ -367,7 +387,8 @@ func take_damage(amount: int):
 		).set_delay(0.5)
 
 func update_timers(delta):
-	if attack_timer > 0:
+	# Only update attack cooldown when in neutral stance (like player)
+	if attack_timer > 0 and current_stance == Stance.NEUTRAL:
 		attack_timer -= delta
 		
 	if stance_change_timer > 0:
