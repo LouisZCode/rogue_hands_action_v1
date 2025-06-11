@@ -34,6 +34,14 @@ var last_player_stance: Player.Stance = Player.Stance.NEUTRAL
 var stance_change_cooldown: float = 0.5
 var stance_change_timer: float = 0.0
 
+# Immunity frames to prevent multiple hits
+@export var immunity_duration: float = 0.5
+var immunity_timer: float = 0.0
+var is_immune: bool = false
+
+# Track which players have been hit during current dash
+var players_hit_this_dash: Array[Node] = []
+
 # References
 @onready var sprite: ColorRect = $Sprite
 @onready var stance_label: Label = $StanceLabel
@@ -69,6 +77,14 @@ func _physics_process(delta):
 	update_ai(delta)
 	update_timers(delta)
 	handle_dash_movement(delta)
+	
+	# Update immunity frames
+	if immunity_timer > 0:
+		immunity_timer -= delta
+		if immunity_timer <= 0:
+			is_immune = false
+			# Reset visual feedback when immunity ends
+			sprite.modulate = Color.WHITE
 
 func update_ai(delta):
 	if is_dashing:
@@ -224,6 +240,9 @@ func perform_dash_attack():
 		dash_timer = dash_duration
 		attack_timer = attack_cooldown
 		
+		# Clear the list of players hit this dash
+		players_hit_this_dash.clear()
+		
 		# Visual feedback
 		var dash_color = stance_colors[current_stance].lerp(Color.WHITE, 0.5)
 		sprite.modulate = dash_color
@@ -238,13 +257,15 @@ func perform_dash_attack():
 		print("Enemy dash attacks with: ", Stance.keys()[current_stance])
 
 func attack_during_dash():
-	if player_ref:
+	if player_ref and not player_ref in players_hit_this_dash:
 		var distance = global_position.distance_to(player_ref.global_position)
 		if distance <= attack_range:
 			# Deal damage based on stance matchup
 			var damage = calculate_combat_damage(current_stance, player_ref.current_stance)
 			if damage > 0:
 				player_ref.take_damage(damage)
+				# Add player to the list of already hit players
+				players_hit_this_dash.append(player_ref)
 				print("Enemy hit player for ", damage, " damage during dash")
 
 func calculate_damage(attacker_stance: Stance, defender_stance: Stance) -> int:
@@ -314,14 +335,25 @@ func take_damage_from_player(player_stance, attack_position: Vector2):
 	print("Combat: Player ", Player.Stance.keys()[player_stance], " vs Enemy ", Stance.keys()[current_stance], " - Damage: ", damage, " - ", result)
 
 func take_damage(amount: int):
+	# Don't take damage if immune
+	if is_immune:
+		return
+		
 	current_health = max(0, current_health - amount)
 	update_health_bar()
+	
+	# Start immunity frames
+	is_immune = true
+	immunity_timer = immunity_duration
 	
 	# Visual feedback for taking damage
 	var tween = create_tween()
 	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 	tween.tween_property(sprite, "modulate", Color.RED, 0.1)
-	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+	tween.tween_property(sprite, "modulate", Color.PINK, 0.1)
+	
+	# Add immunity frame visual feedback (flickering)
+	tween.tween_callback(func(): add_immunity_visual_feedback())
 	
 	if current_health <= 0:
 		die()
@@ -386,6 +418,14 @@ func _on_detection_area_body_exited(body):
 		current_stance = Stance.NEUTRAL
 		update_visual()
 		print("Enemy lost player - returning to idle")
+
+func add_immunity_visual_feedback():
+	# Create flickering effect during immunity frames
+	if is_immune:
+		var flicker_tween = create_tween()
+		flicker_tween.set_loops(int(immunity_duration * 10))  # Flicker 10 times per second
+		flicker_tween.tween_property(sprite, "modulate:a", 0.3, 0.05)
+		flicker_tween.tween_property(sprite, "modulate:a", 1.0, 0.05)
 
 func _on_attack_area_body_entered(body):
 	# Attack area entry is now handled in the tactical AI states

@@ -21,6 +21,14 @@ var dash_timer: float = 0.0
 @export var attack_cooldown: float = 1.0
 var attack_cooldown_timer: float = 0.0
 
+# Immunity frames to prevent multiple hits
+@export var immunity_duration: float = 0.5
+var immunity_timer: float = 0.0
+var is_immune: bool = false
+
+# Track which enemies have been hit during current dash
+var enemies_hit_this_dash: Array[Node] = []
+
 # References
 @onready var sprite: ColorRect = $Sprite
 @onready var stance_label: Label = $StanceLabel
@@ -54,10 +62,18 @@ func _physics_process(delta):
 	handle_movement(delta)
 	handle_input()
 	
-	# Update attack cooldown
-	if attack_cooldown_timer > 0:
+	# Update attack cooldown - only recover when in neutral stance
+	if attack_cooldown_timer > 0 and current_stance == Stance.NEUTRAL:
 		attack_cooldown_timer -= delta
 		attack_cooldown_changed.emit(attack_cooldown_timer, attack_cooldown)
+	
+	# Update immunity frames
+	if immunity_timer > 0:
+		immunity_timer -= delta
+		if immunity_timer <= 0:
+			is_immune = false
+			# Reset visual feedback when immunity ends
+			sprite.modulate = Color.WHITE
 	
 	# Check for attack hits during dash
 	if is_dashing:
@@ -158,6 +174,9 @@ func perform_dash_attack(direction: Vector2):
 	# Start attack cooldown
 	attack_cooldown_timer = attack_cooldown
 	
+	# Clear the list of enemies hit this dash
+	enemies_hit_this_dash.clear()
+	
 	# Visual feedback for dash attack
 	var dash_color = stance_colors[current_stance].lerp(Color.WHITE, 0.5)
 	sprite.modulate = dash_color
@@ -179,10 +198,16 @@ func attack_during_dash():
 	# Check for enemies in attack range during dash
 	var bodies = attack_area.get_overlapping_bodies()
 	for body in bodies:
-		if body.has_method("take_damage_from_player"):
+		if body.has_method("take_damage_from_player") and not body in enemies_hit_this_dash:
 			body.take_damage_from_player(current_stance, global_position)
+			# Add enemy to the list of already hit enemies
+			enemies_hit_this_dash.append(body)
 
 func take_damage(amount: int):
+	# Don't take damage if immune
+	if is_immune:
+		return
+		
 	# Players in neutral stance take reduced damage (25% of original damage)
 	var final_damage = amount
 	if current_stance == Stance.NEUTRAL:
@@ -191,16 +216,23 @@ func take_damage(amount: int):
 	current_health = max(0, current_health - final_damage)
 	health_changed.emit(current_health)
 	
+	# Start immunity frames
+	is_immune = true
+	immunity_timer = immunity_duration
+	
 	# Visual feedback for taking damage (different color for neutral stance)
 	var tween = create_tween()
 	if current_stance == Stance.NEUTRAL:
 		# Blue flash for reduced damage in neutral stance
 		tween.tween_property(sprite, "modulate", Color.CYAN, 0.1)
-		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+		tween.tween_property(sprite, "modulate", Color.LIGHT_BLUE, 0.1)
 	else:
 		# Red flash for normal damage
 		tween.tween_property(sprite, "modulate", Color.RED, 0.1)
-		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+		tween.tween_property(sprite, "modulate", Color.PINK, 0.1)
+	
+	# Add immunity frame visual feedback (flickering)
+	tween.tween_callback(func(): add_immunity_visual_feedback())
 	
 	if current_health <= 0:
 		die()
@@ -213,6 +245,14 @@ func die():
 	print("Player died!")
 	# Handle player death (restart game, etc.)
 	get_tree().reload_current_scene()
+
+func add_immunity_visual_feedback():
+	# Create flickering effect during immunity frames
+	if is_immune:
+		var flicker_tween = create_tween()
+		flicker_tween.set_loops(int(immunity_duration * 10))  # Flicker 10 times per second
+		flicker_tween.tween_property(sprite, "modulate:a", 0.3, 0.05)
+		flicker_tween.tween_property(sprite, "modulate:a", 1.0, 0.05)
 
 func _on_attack_area_body_entered(body):
 	# This is called when something enters attack range
