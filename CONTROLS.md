@@ -1,23 +1,29 @@
 # Rogue Hands Action Game - Controls
 
 ## Player Movement
-- **W** - Move Up
-- **A** - Move Left  
-- **S** - Move Down
-- **D** - Move Right
+- **W** - Move Up (only in Neutral stance)
+- **A** - Move Left (only in Neutral stance)
+- **S** - Move Down (only in Neutral stance)
+- **D** - Move Right (only in Neutral stance)
 
-## Enhanced Combat System (Rock-Paper-Scissors)
-- **Default State**: Neutral stance 👤 (cannot attack or be attacked)
-- **Hold J** - Activate Rock stance ✊ (beats Scissors)
-- **Hold K** - Activate Paper stance ✋ (beats Rock)
-- **Hold L** - Activate Scissors stance ✌️ (beats Paper)
-- **SPACEBAR** - Attack with current stance (only works when holding a stance key)
+## Core Directional Combat System
+- **Default State**: Neutral stance 👤 (can move freely, cannot attack or be attacked)
+- **Hold J** - Activate Rock stance ✊ (stops movement, enables directional attacks)
+- **Hold K** - Activate Paper stance ✋ (stops movement, enables directional attacks)
+- **Hold L** - Activate Scissors stance ✌️ (stops movement, enables directional attacks)
+
+## Directional Dash Attacks
+- **SPACEBAR + W** - Dash attack upward
+- **SPACEBAR + A** - Dash attack left
+- **SPACEBAR + S** - Dash attack downward
+- **SPACEBAR + D** - Dash attack right
+- **SPACEBAR + Diagonal** - Dash attack diagonally (e.g., W+A for up-left)
 
 ## How to Play
-1. Use WASD to move around the arena
-2. **HOLD** J, K, or L to activate Rock, Paper, or Scissors stance
-3. While holding a stance key, get close to enemies and press SPACEBAR to attack
-4. **Release** the stance key to return to safe Neutral stance
+1. Use WASD to move around the arena **ONLY when in Neutral stance**
+2. **HOLD** J, K, or L to activate a combat stance - **movement stops but you can attack**
+3. While holding a stance key, **hold a WASD direction + press SPACEBAR** to dash attack in that direction
+4. **Release** the stance key to return to safe Neutral stance and resume movement
 5. Your stance determines damage:
    - **Win**: Deal 30 damage
    - **Tie**: Deal 10 damage  
@@ -25,9 +31,10 @@
 6. Enemy always uses Rock stance, so hold K (Paper) for maximum damage!
 
 ## Strategic Elements
-- **Neutral Stance**: You cannot attack or be attacked - use this for safe movement
-- **Active Stances**: Required for combat but makes you vulnerable to enemy attacks
-- **Risk vs Reward**: Choose when to engage by holding stance keys
+- **Neutral Stance**: Free movement, safe from attacks, but cannot attack
+- **Combat Stances**: Movement locked, vulnerable to attacks, but can perform dash attacks
+- **Directional Attacks**: Must aim your dash attacks with WASD + SPACEBAR
+- **Risk vs Reward**: Choose when to stop and fight vs when to move and reposition
 
 ## UI Elements
 - **Green Health Bar** (bottom left) - Your health
