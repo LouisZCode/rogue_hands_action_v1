@@ -288,8 +288,9 @@ func apply_stun():
 		is_dashing = false
 		dash_timer = 0.0
 		velocity = Vector2.ZERO
-		# Return to neutral stance when dash is cancelled
-		change_stance(Stance.NEUTRAL)
+	
+	# Always change to neutral stance when stunned
+	change_stance(Stance.NEUTRAL)
 	
 	# Visual feedback for stun
 	var tween = create_tween()

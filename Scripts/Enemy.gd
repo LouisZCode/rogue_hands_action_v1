@@ -517,6 +517,10 @@ func update_timers(delta):
 	# Update stun timer
 	if stun_timer > 0:
 		stun_timer -= delta
+		if stun_timer <= 0:
+			# Hide stun indicator when timer ends
+			if stun_indicator:
+				stun_indicator.visible = false
 
 func update_visual():
 	sprite.color = stance_colors[current_stance]
@@ -562,6 +566,10 @@ func apply_stun():
 		is_dashing = false
 		dash_timer = 0.0
 		velocity = Vector2.ZERO
+	
+	# Change to neutral stance when stunned
+	current_stance = Stance.NEUTRAL
+	update_visual()
 	
 	# Visual feedback for stun
 	var tween = create_tween()
