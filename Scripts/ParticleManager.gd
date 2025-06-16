@@ -104,3 +104,30 @@ func create_attack_effect(pos: Vector2, direction: Vector2):
 	cleanup_timer.start()
 	
 	print("Attack particles created at: ", pos, " in direction: ", direction)
+
+func create_parry_effect(pos: Vector2):
+	# Use gesture particles for parry with special blue/white color for tactical highlight
+	var particles = gesture_particles_scene.instantiate()
+	get_tree().current_scene.add_child(particles)
+	particles.global_position = pos
+	
+	# Ensure we have a ParticleProcessMaterial
+	if not particles.process_material:
+		particles.process_material = ParticleProcessMaterial.new()
+	
+	var material = particles.process_material as ParticleProcessMaterial
+	if material:
+		material.color = Color.CYAN  # Bright blue-white for parry success
+		material.spread = 180.0  # Wide spread for dramatic effect
+	
+	particles.emitting = true
+	
+	# Auto-cleanup
+	var cleanup_timer = Timer.new()
+	cleanup_timer.wait_time = particles.lifetime + 0.5
+	cleanup_timer.one_shot = true
+	cleanup_timer.timeout.connect(func(): particles.queue_free())
+	particles.add_child(cleanup_timer)
+	cleanup_timer.start()
+	
+	print("Parry particles created at: ", pos)

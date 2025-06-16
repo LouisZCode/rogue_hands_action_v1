@@ -257,10 +257,7 @@ func take_damage(amount: int):
 	current_health = max(0, current_health - final_damage)
 	health_changed.emit(current_health)
 	
-	# Create hit particle effect
-	var game_manager = get_tree().get_first_node_in_group("game_manager")
-	if game_manager and game_manager.particle_manager:
-		game_manager.particle_manager.create_hit_effect(global_position)
+	# Removed hit particles for cleaner gameplay
 	
 	# Start immunity frames
 	is_immune = true

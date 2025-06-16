@@ -457,9 +457,13 @@ func attack_during_dash():
 			elif combat_result.damage > 0:
 				player_ref.take_damage(combat_result.damage)
 			
-			# Handle enemy stun
+			# Handle enemy stun (parry success!)
 			if combat_result.enemy_stunned:
 				apply_stun()
+				# Create parry particle effect at enemy position
+				var game_manager = get_tree().get_first_node_in_group("game_manager")
+				if game_manager and game_manager.particle_manager:
+					game_manager.particle_manager.create_parry_effect(global_position)
 			
 			# Add player to the list of already hit players
 			players_hit_this_dash.append(player_ref)
@@ -577,10 +581,14 @@ func take_damage_from_player(player_stance, attack_position: Vector2, is_mutual_
 	elif damage > 0:
 		take_damage(damage)
 	
-	# Handle player stun
+	# Handle player stun (enemy successfully parried!)
 	if player_stunned:
 		if player_ref and player_ref.has_method("apply_stun"):
 			player_ref.apply_stun()
+			# Create parry particle effect at player position
+			var game_manager = get_tree().get_first_node_in_group("game_manager")
+			if game_manager and game_manager.particle_manager:
+				game_manager.particle_manager.create_parry_effect(player_ref.global_position)
 	
 	print("Combat: Player ", Player.Stance.keys()[player_stance], " vs Enemy ", Stance.keys()[current_stance], " - Damage: ", damage, " - ", result)
 
@@ -592,10 +600,7 @@ func take_damage(amount: int):
 	current_health = max(0, current_health - amount)
 	update_health_bar()
 	
-	# Create hit particle effect
-	var game_manager = get_tree().get_first_node_in_group("game_manager")
-	if game_manager and game_manager.particle_manager:
-		game_manager.particle_manager.create_hit_effect(global_position)
+	# Removed hit particles for cleaner gameplay
 	
 	# Start immunity frames
 	is_immune = true

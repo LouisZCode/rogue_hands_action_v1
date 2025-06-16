@@ -51,17 +51,11 @@ func _on_player_health_changed(new_health: int):
 
 func _on_player_stance_changed(new_stance: Player.Stance):
 	update_stance_ui(new_stance)
-	# Create stance change particle effect
-	if particle_manager and player:
-		var stance_color = player.stance_colors[new_stance]
-		particle_manager.create_stance_change_effect(player.global_position, stance_color)
+	# Removed stance change particles for cleaner gameplay
 
 func _on_player_attack(attacker_stance: Player.Stance, attack_position: Vector2):
 	print("Player attacks with: ", Player.Stance.keys()[attacker_stance])
-	# Create attack particle effect
-	if particle_manager and player:
-		var attack_direction = (attack_position - player.global_position).normalized()
-		particle_manager.create_attack_effect(player.global_position, attack_direction)
+	# Removed attack particles for cleaner gameplay
 
 func _on_player_attack_cooldown_changed(current_cooldown: float, max_cooldown: float):
 	update_attack_cooldown_ui(current_cooldown, max_cooldown)
@@ -78,10 +72,7 @@ func _on_enemy_died():
 
 func _on_enemy_attack(attacker_stance: Enemy.Stance, attack_position: Vector2):
 	print("Enemy attacks with: ", Enemy.Stance.keys()[attacker_stance])
-	# Create attack particle effect for enemy
-	if particle_manager and enemy:
-		var attack_direction = (attack_position - enemy.global_position).normalized()
-		particle_manager.create_attack_effect(enemy.global_position, attack_direction)
+	# Removed attack particles for cleaner gameplay
 
 func _on_player_defense_points_changed(current_defense: int, max_defense: int):
 	update_player_defense_points_ui(current_defense, max_defense)
