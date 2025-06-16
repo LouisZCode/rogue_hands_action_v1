@@ -19,7 +19,7 @@ var max_defense_points: int = 1
 var current_defense_points: int = 1
 
 # AI State - Enhanced tactical system
-enum AIState { IDLE, WALKING, OBSERVING, POSITIONING, STANCE_SELECTION, ATTACKING, RETREATING, STUNNED }
+enum AIState { IDLE, WALKING, LOST_PLAYER, ALERT, OBSERVING, POSITIONING, STANCE_SELECTION, ATTACKING, RETREATING, STUNNED }
 var current_state: AIState = AIState.WALKING
 var player_ref: Player = null
 
@@ -47,6 +47,18 @@ var walking_timer: float = 0.0
 var walking_speed: float = 50.0  # Slower than normal speed
 var direction_change_interval: float = 2.5  # Change direction every 2.5 seconds
 
+# Idle and lost player state variables
+var idle_timer: float = 0.0
+var idle_duration_min: float = 1.0
+var idle_duration_max: float = 3.0
+var lost_player_timer: float = 0.0
+var lost_player_duration: float = 2.5  # Time spent confused before giving up
+
+# Alert state variables
+var alert_timer: float = 0.0
+var alert_duration: float = 1.0  # 1 second alert display
+var is_alerting: bool = false
+
 # Immunity frames to prevent multiple hits
 @export var immunity_duration: float = 0.5
 var immunity_timer: float = 0.0
@@ -65,6 +77,8 @@ var players_hit_this_dash: Array[Node] = []
 @onready var health_bar: ProgressBar = $HealthBar
 @onready var defense_point_label: Label = $DefensePoint
 @onready var stun_indicator: Label = $StunIndicator
+@onready var lost_indicator: Label = $LostIndicator
+@onready var alert_indicator: Label = $AlertIndicator
 @onready var detection_area: Area2D = $DetectionArea
 @onready var attack_area: Area2D = $AttackArea
 
@@ -99,6 +113,14 @@ func _ready():
 	pick_new_walking_direction()
 	walking_timer = direction_change_interval
 	
+	# Ensure indicators start hidden
+	if stun_indicator:
+		stun_indicator.visible = false
+	if lost_indicator:
+		lost_indicator.visible = false
+	if alert_indicator:
+		alert_indicator.visible = false
+	
 func _physics_process(delta):
 	update_ai(delta)
 	update_timers(delta)
@@ -121,11 +143,46 @@ func update_ai(delta):
 		AIState.IDLE:
 			velocity = Vector2.ZERO
 			current_stance = Stance.NEUTRAL
+			# Check if idle time is over
+			if idle_timer <= 0:
+				current_state = AIState.WALKING
+				pick_new_walking_direction()
+				walking_timer = direction_change_interval
 		
 		AIState.WALKING:
 			# Random walking behavior when no player detected
 			current_stance = Stance.NEUTRAL
 			handle_walking_movement()
+		
+		AIState.LOST_PLAYER:
+			# Stand still and look confused
+			velocity = Vector2.ZERO
+			current_stance = Stance.NEUTRAL
+			# Check if confusion time is over
+			if lost_player_timer <= 0:
+				# Hide lost indicator
+				if lost_indicator:
+					lost_indicator.visible = false
+					print("DEBUG: Hiding lost indicator - timer expired")
+				# Return to walking
+				current_state = AIState.WALKING
+				pick_new_walking_direction()
+				walking_timer = direction_change_interval
+				print("DEBUG: Lost player timer expired, returning to walking")
+		
+		AIState.ALERT:
+			# Stand still and show alert - brief pause before engaging
+			velocity = Vector2.ZERO
+			current_stance = Stance.NEUTRAL
+			# Check if alert time is over
+			if alert_timer <= 0:
+				# Hide alert indicator
+				if alert_indicator:
+					alert_indicator.visible = false
+				is_alerting = false
+				# Start observing player
+				current_state = AIState.OBSERVING
+				positioning_timer = randf_range(0.5, 1.0)
 			
 		AIState.OBSERVING:
 			# Stand still and observe player behavior
@@ -180,9 +237,12 @@ func update_ai(delta):
 					current_state = AIState.OBSERVING
 					positioning_timer = randf_range(0.5, 1.5)
 				else:
-					current_state = AIState.WALKING
-					pick_new_walking_direction()
-					walking_timer = direction_change_interval
+					# Show confusion after retreat before going back to patrol
+					current_state = AIState.LOST_PLAYER
+					lost_player_timer = lost_player_duration
+					if lost_indicator:
+						lost_indicator.visible = true
+					print("DEBUG: Retreat finished, showing confusion, timer set to: ", lost_player_timer)
 				
 		AIState.STUNNED:
 			velocity = Vector2.ZERO
@@ -201,8 +261,15 @@ func update_ai(delta):
 func handle_walking_movement():
 	# Change direction periodically or if hitting boundaries
 	if walking_timer <= 0 or is_near_boundary():
-		pick_new_walking_direction()
-		walking_timer = direction_change_interval + randf_range(-0.5, 0.5)  # Add some randomness
+		# 40% chance to go idle instead of continuing to walk
+		if randf() < 0.4:
+			current_state = AIState.IDLE
+			idle_timer = randf_range(idle_duration_min, idle_duration_max)
+			velocity = Vector2.ZERO
+			return
+		else:
+			pick_new_walking_direction()
+			walking_timer = direction_change_interval + randf_range(-0.5, 0.5)  # Add some randomness
 	
 	# Move in the current walking direction
 	velocity = walking_direction * walking_speed
@@ -577,6 +644,20 @@ func update_timers(delta):
 	# Update walking timer
 	if walking_timer > 0:
 		walking_timer -= delta
+	
+	# Update idle timer
+	if idle_timer > 0:
+		idle_timer -= delta
+	
+	# Update lost player timer
+	if lost_player_timer > 0:
+		lost_player_timer -= delta
+		if current_state == AIState.LOST_PLAYER:
+			print("DEBUG: Lost player timer: ", lost_player_timer)
+	
+	# Update alert timer
+	if alert_timer > 0:
+		alert_timer -= delta
 
 func update_visual():
 	sprite.color = stance_colors[current_stance]
@@ -643,22 +724,55 @@ func die():
 func _on_detection_area_body_entered(body):
 	if body is Player:
 		player_ref = body
-		current_state = AIState.OBSERVING
-		positioning_timer = randf_range(0.5, 1.0)
-		print("Enemy detected player - entering tactical mode")
+		
+		# Hide any active indicators when player is detected again
+		if lost_indicator:
+			lost_indicator.visible = false
+		if alert_indicator and not is_alerting:
+			alert_indicator.visible = false
+		
+		# Check if we were in patrol states (trigger alert)
+		var was_patrolling = current_state in [AIState.WALKING, AIState.IDLE]
+		
+		if was_patrolling:
+			# Show alert first
+			current_state = AIState.ALERT
+			is_alerting = true
+			alert_timer = alert_duration
+			if alert_indicator:
+				alert_indicator.visible = true
+			print("Enemy spotted player - ALERT!")
+		else:
+			# Was already in some other state, go directly to observing
+			current_state = AIState.OBSERVING
+			positioning_timer = randf_range(0.5, 1.0)
+			print("Enemy detected player - entering tactical mode")
 
 func _on_detection_area_body_exited(body):
 	if body is Player:
 		# Don't interrupt if enemy is in attacking state (committed to attack)
 		if current_state != AIState.ATTACKING:
 			player_ref = null
-			current_state = AIState.WALKING
+			
+			# Check if we were in combat states (not just walking around)
+			var was_in_combat = current_state in [AIState.ALERT, AIState.OBSERVING, AIState.POSITIONING, AIState.STANCE_SELECTION, AIState.RETREATING]
+			
+			if was_in_combat:
+				# Show confusion before returning to patrol
+				current_state = AIState.LOST_PLAYER
+				lost_player_timer = lost_player_duration
+				if lost_indicator:
+					lost_indicator.visible = true
+				print("DEBUG: Enemy confused - lost player during combat, timer set to: ", lost_player_timer)
+			else:
+				# Was just walking, return to walking immediately
+				current_state = AIState.WALKING
+				pick_new_walking_direction()
+				walking_timer = direction_change_interval
+				print("Enemy lost player - returning to walking")
+			
 			current_stance = Stance.NEUTRAL
 			update_visual()
-			# Initialize walking behavior
-			pick_new_walking_direction()
-			walking_timer = direction_change_interval
-			print("Enemy lost player - returning to walking")
 
 func add_immunity_visual_feedback():
 	# Create flickering effect during immunity frames
