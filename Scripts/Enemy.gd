@@ -19,8 +19,8 @@ var max_defense_points: int = 1
 var current_defense_points: int = 1
 
 # AI State - Enhanced tactical system
-enum AIState { IDLE, OBSERVING, POSITIONING, STANCE_SELECTION, ATTACKING, RETREATING, STUNNED }
-var current_state: AIState = AIState.IDLE
+enum AIState { IDLE, WALKING, OBSERVING, POSITIONING, STANCE_SELECTION, ATTACKING, RETREATING, STUNNED }
+var current_state: AIState = AIState.WALKING
 var player_ref: Player = null
 
 # Attack system mirroring player
@@ -40,6 +40,12 @@ var stance_change_timer: float = 0.0
 var stance_to_dash_delay: float = 2.0  # 2 second delay after stance change
 var stance_to_dash_timer: float = 0.0
 var target_attack_position: Vector2  # Store player position when stance is selected
+
+# Walking state variables
+var walking_direction: Vector2 = Vector2.ZERO
+var walking_timer: float = 0.0
+var walking_speed: float = 50.0  # Slower than normal speed
+var direction_change_interval: float = 2.5  # Change direction every 2.5 seconds
 
 # Immunity frames to prevent multiple hits
 @export var immunity_duration: float = 0.5
@@ -89,6 +95,10 @@ func _ready():
 	# Emit initial defense points
 	enemy_defense_points_changed.emit(current_defense_points, max_defense_points)
 	
+	# Initialize walking behavior
+	pick_new_walking_direction()
+	walking_timer = direction_change_interval
+	
 func _physics_process(delta):
 	update_ai(delta)
 	update_timers(delta)
@@ -111,6 +121,11 @@ func update_ai(delta):
 		AIState.IDLE:
 			velocity = Vector2.ZERO
 			current_stance = Stance.NEUTRAL
+		
+		AIState.WALKING:
+			# Random walking behavior when no player detected
+			current_stance = Stance.NEUTRAL
+			handle_walking_movement()
 			
 		AIState.OBSERVING:
 			# Stand still and observe player behavior
@@ -160,8 +175,14 @@ func update_ai(delta):
 			if retreat_timer <= 0:
 				current_stance = Stance.NEUTRAL
 				update_visual()
-				current_state = AIState.OBSERVING
-				positioning_timer = randf_range(0.5, 1.5)
+				# Return to walking if no player, otherwise keep observing
+				if player_ref:
+					current_state = AIState.OBSERVING
+					positioning_timer = randf_range(0.5, 1.5)
+				else:
+					current_state = AIState.WALKING
+					pick_new_walking_direction()
+					walking_timer = direction_change_interval
 				
 		AIState.STUNNED:
 			velocity = Vector2.ZERO
@@ -176,6 +197,37 @@ func update_ai(delta):
 	# Movement is now handled in handle_dash_movement() during dashes
 	if not is_dashing:
 		move_and_slide()
+
+func handle_walking_movement():
+	# Change direction periodically or if hitting boundaries
+	if walking_timer <= 0 or is_near_boundary():
+		pick_new_walking_direction()
+		walking_timer = direction_change_interval + randf_range(-0.5, 0.5)  # Add some randomness
+	
+	# Move in the current walking direction
+	velocity = walking_direction * walking_speed
+
+func pick_new_walking_direction():
+	# Pick a random direction
+	var angle = randf() * 2 * PI
+	walking_direction = Vector2(cos(angle), sin(angle))
+	
+	# Make sure we're not walking directly into a wall
+	var test_position = global_position + walking_direction * 100
+	if is_position_near_boundary(test_position):
+		# Pick direction towards center instead
+		walking_direction = (Vector2.ZERO - global_position).normalized()
+		# Add some randomness to avoid getting stuck
+		var random_offset = Vector2(randf_range(-0.5, 0.5), randf_range(-0.5, 0.5))
+		walking_direction = (walking_direction + random_offset).normalized()
+
+func is_near_boundary() -> bool:
+	return is_position_near_boundary(global_position)
+
+func is_position_near_boundary(pos: Vector2) -> bool:
+	# Check if position is near arena boundaries (with some margin)
+	var margin = 50.0
+	return pos.x < -425 + margin or pos.x > 425 - margin or pos.y < -325 + margin or pos.y > 325 - margin
 
 # New AI methods for tactical combat
 func observe_player():
@@ -521,6 +573,10 @@ func update_timers(delta):
 			# Hide stun indicator when timer ends
 			if stun_indicator:
 				stun_indicator.visible = false
+	
+	# Update walking timer
+	if walking_timer > 0:
+		walking_timer -= delta
 
 func update_visual():
 	sprite.color = stance_colors[current_stance]
@@ -596,10 +652,13 @@ func _on_detection_area_body_exited(body):
 		# Don't interrupt if enemy is in attacking state (committed to attack)
 		if current_state != AIState.ATTACKING:
 			player_ref = null
-			current_state = AIState.IDLE
+			current_state = AIState.WALKING
 			current_stance = Stance.NEUTRAL
 			update_visual()
-			print("Enemy lost player - returning to idle")
+			# Initialize walking behavior
+			pick_new_walking_direction()
+			walking_timer = direction_change_interval
+			print("Enemy lost player - returning to walking")
 
 func add_immunity_visual_feedback():
 	# Create flickering effect during immunity frames
