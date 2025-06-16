@@ -72,7 +72,7 @@ var stun_timer: float = 0.0
 var players_hit_this_dash: Array[Node] = []
 
 # References
-@onready var sprite: ColorRect = $Sprite
+@onready var sprite: Sprite2D = $Sprite
 @onready var stance_label: Label = $StanceLabel
 @onready var health_bar: ProgressBar = $HealthBar
 @onready var defense_point_label: Label = $DefensePoint
@@ -143,6 +143,8 @@ func update_ai(delta):
 		AIState.IDLE:
 			velocity = Vector2.ZERO
 			current_stance = Stance.NEUTRAL
+			# Hide any lingering indicators
+			hide_all_indicators()
 			# Check if idle time is over
 			if idle_timer <= 0:
 				current_state = AIState.WALKING
@@ -152,6 +154,8 @@ func update_ai(delta):
 		AIState.WALKING:
 			# Random walking behavior when no player detected
 			current_stance = Stance.NEUTRAL
+			# Hide any lingering indicators
+			hide_all_indicators()
 			handle_walking_movement()
 		
 		AIState.LOST_PLAYER:
@@ -588,6 +592,11 @@ func take_damage(amount: int):
 	current_health = max(0, current_health - amount)
 	update_health_bar()
 	
+	# Create hit particle effect
+	var game_manager = get_tree().get_first_node_in_group("game_manager")
+	if game_manager and game_manager.particle_manager:
+		game_manager.particle_manager.create_hit_effect(global_position)
+	
 	# Start immunity frames
 	is_immune = true
 	immunity_timer = immunity_duration
@@ -660,7 +669,17 @@ func update_timers(delta):
 		alert_timer -= delta
 
 func update_visual():
-	sprite.color = stance_colors[current_stance]
+	# Update sprite texture based on stance
+	match current_stance:
+		Stance.NEUTRAL:
+			sprite.texture = preload("res://assets/test_sprites/idle_enemy.png")
+		Stance.ROCK:
+			sprite.texture = preload("res://assets/test_sprites/rock_enemy.png")
+		Stance.PAPER:
+			sprite.texture = preload("res://assets/test_sprites/paper_enemy.png")
+		Stance.SCISSORS:
+			sprite.texture = preload("res://assets/test_sprites/scissor_enemy.png")
+	
 	stance_label.text = stance_symbols[current_stance]
 	update_health_bar()
 	update_defense_point_visual()
@@ -708,6 +727,9 @@ func apply_stun():
 	current_stance = Stance.NEUTRAL
 	update_visual()
 	
+	# Hide all other indicators when stunned
+	hide_all_indicators()
+	
 	# Visual feedback for stun
 	var tween = create_tween()
 	tween.tween_property(sprite, "modulate", Color.PURPLE, 0.2)
@@ -720,6 +742,13 @@ func die():
 	print("Enemy died!")
 	enemy_died.emit()
 	queue_free()
+
+func hide_all_indicators():
+	if alert_indicator:
+		alert_indicator.visible = false
+	if lost_indicator:
+		lost_indicator.visible = false
+	# Don't hide stun indicator - it should only be controlled by stun system
 
 func _on_detection_area_body_entered(body):
 	if body is Player:

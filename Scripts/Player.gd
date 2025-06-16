@@ -39,7 +39,7 @@ var is_stunned: bool = false
 var enemies_hit_this_dash: Array[Node] = []
 
 # References
-@onready var sprite: ColorRect = $Sprite
+@onready var sprite: Sprite2D = $Sprite
 @onready var stance_label: Label = $StanceLabel
 @onready var stun_indicator: Label = $StunIndicator
 @onready var attack_area: Area2D = $AttackArea
@@ -191,7 +191,17 @@ func change_stance(new_stance: Stance):
 		stance_changed.emit(current_stance)
 
 func update_stance_visual():
-	sprite.color = stance_colors[current_stance]
+	# Update sprite texture based on stance
+	match current_stance:
+		Stance.NEUTRAL:
+			sprite.texture = preload("res://assets/test_sprites/idle_player.png")
+		Stance.ROCK:
+			sprite.texture = preload("res://assets/test_sprites/rock_player.png")
+		Stance.PAPER:
+			sprite.texture = preload("res://assets/test_sprites/paper_player.png")
+		Stance.SCISSORS:
+			sprite.texture = preload("res://assets/test_sprites/scissor_player.png")
+	
 	stance_label.text = stance_symbols[current_stance]
 
 func perform_dash_attack(direction: Vector2):
@@ -246,6 +256,11 @@ func take_damage(amount: int):
 		
 	current_health = max(0, current_health - final_damage)
 	health_changed.emit(current_health)
+	
+	# Create hit particle effect
+	var game_manager = get_tree().get_first_node_in_group("game_manager")
+	if game_manager and game_manager.particle_manager:
+		game_manager.particle_manager.create_hit_effect(global_position)
 	
 	# Start immunity frames
 	is_immune = true
