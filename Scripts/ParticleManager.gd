@@ -28,7 +28,15 @@ func create_stance_change_effect(pos: Vector2, stance_color: Color):
 	var particles = gesture_particles_scene.instantiate()
 	get_tree().current_scene.add_child(particles)
 	particles.global_position = pos
-	particles.process_material.color = stance_color
+	
+	# Ensure we have a ParticleProcessMaterial
+	if not particles.process_material:
+		particles.process_material = ParticleProcessMaterial.new()
+	
+	var material = particles.process_material as ParticleProcessMaterial
+	if material:
+		material.color = stance_color
+	
 	particles.emitting = true
 	
 	# Auto-cleanup after particle lifetime
@@ -47,7 +55,15 @@ func create_death_effect(pos: Vector2):
 	get_tree().current_scene.add_child(particles)
 	particles.global_position = pos
 	particles.amount = 100  # More particles for dramatic effect
-	particles.process_material.color = Color.RED
+	
+	# Ensure we have a ParticleProcessMaterial
+	if not particles.process_material:
+		particles.process_material = ParticleProcessMaterial.new()
+	
+	var material = particles.process_material as ParticleProcessMaterial
+	if material:
+		material.color = Color.RED
+	
 	particles.emitting = true
 	
 	# Longer cleanup time for death effect
@@ -65,11 +81,18 @@ func create_attack_effect(pos: Vector2, direction: Vector2):
 	get_tree().current_scene.add_child(particles)
 	particles.global_position = pos
 	
-	# Set particle direction based on attack direction
-	var angle_rad = direction.angle()
-	particles.process_material.direction = Vector3(cos(angle_rad), sin(angle_rad), 0)
-	particles.process_material.spread = 30.0  # Narrower spread for directional attack
-	particles.process_material.color = Color.YELLOW
+	# Ensure we have a ParticleProcessMaterial
+	if not particles.process_material:
+		particles.process_material = ParticleProcessMaterial.new()
+	
+	var material = particles.process_material as ParticleProcessMaterial
+	if material:
+		# Set particle direction based on attack direction
+		var angle_rad = direction.angle()
+		material.direction = Vector3(cos(angle_rad), sin(angle_rad), 0)
+		material.spread = 30.0  # Narrower spread for directional attack
+		material.color = Color.YELLOW
+	
 	particles.emitting = true
 	
 	# Auto-cleanup
