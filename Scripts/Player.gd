@@ -31,7 +31,7 @@ var immunity_timer: float = 0.0
 var is_immune: bool = false
 
 # Stun system
-@export var stun_duration: float = 1.0
+@export var stun_duration: float = 3.0
 var stun_timer: float = 0.0
 var is_stunned: bool = false
 
@@ -41,6 +41,7 @@ var enemies_hit_this_dash: Array[Node] = []
 # References
 @onready var sprite: ColorRect = $Sprite
 @onready var stance_label: Label = $StanceLabel
+@onready var stun_indicator: Label = $StunIndicator
 @onready var attack_area: Area2D = $AttackArea
 
 # Stance colors and symbols
@@ -94,12 +95,20 @@ func _physics_process(delta):
 			is_stunned = false
 			# Reset visual feedback when stun ends
 			sprite.modulate = Color.WHITE
+			if stun_indicator:
+				stun_indicator.visible = false
 	
 	# Check for attack hits during dash
 	if is_dashing:
 		attack_during_dash()
 
 func handle_movement(delta):
+	# No movement allowed when stunned
+	if is_stunned:
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
+	
 	# Handle dash movement
 	if is_dashing:
 		dash_timer -= delta
@@ -273,9 +282,21 @@ func consume_defense_point() -> bool:
 func apply_stun():
 	is_stunned = true
 	stun_timer = stun_duration
+	
+	# Cancel any ongoing dash immediately
+	if is_dashing:
+		is_dashing = false
+		dash_timer = 0.0
+		velocity = Vector2.ZERO
+		# Return to neutral stance when dash is cancelled
+		change_stance(Stance.NEUTRAL)
+	
 	# Visual feedback for stun
 	var tween = create_tween()
 	tween.tween_property(sprite, "modulate", Color.PURPLE, 0.2)
+	# Show stun indicator
+	if stun_indicator:
+		stun_indicator.visible = true
 	print("Player stunned for ", stun_duration, " seconds!")
 
 func die():

@@ -47,7 +47,7 @@ var immunity_timer: float = 0.0
 var is_immune: bool = false
 
 # Stun system (enhanced existing STUNNED state)
-@export var stun_duration: float = 1.0
+@export var stun_duration: float = 3.0
 var stun_timer: float = 0.0
 
 # Track which players have been hit during current dash
@@ -58,6 +58,7 @@ var players_hit_this_dash: Array[Node] = []
 @onready var stance_label: Label = $StanceLabel
 @onready var health_bar: ProgressBar = $HealthBar
 @onready var defense_point_label: Label = $DefensePoint
+@onready var stun_indicator: Label = $StunIndicator
 @onready var detection_area: Area2D = $DetectionArea
 @onready var attack_area: Area2D = $AttackArea
 
@@ -168,6 +169,9 @@ func update_ai(delta):
 			if stun_timer <= 0:
 				current_state = AIState.RETREATING
 				retreat_timer = 1.0
+				# Hide stun indicator when stun ends
+				if stun_indicator:
+					stun_indicator.visible = false
 	
 	# Movement is now handled in handle_dash_movement() during dashes
 	if not is_dashing:
@@ -251,6 +255,15 @@ func retreat_from_player():
 		velocity = direction * speed * 0.8
 
 func handle_dash_movement(delta):
+	# No dash movement allowed when stunned
+	if current_state == AIState.STUNNED:
+		if is_dashing:
+			# Cancel ongoing dash when stunned
+			is_dashing = false
+			dash_timer = 0.0
+			velocity = Vector2.ZERO
+		return
+	
 	if is_dashing:
 		dash_timer -= delta
 		if dash_timer <= 0:
@@ -543,9 +556,19 @@ func consume_defense_point() -> bool:
 func apply_stun():
 	current_state = AIState.STUNNED
 	stun_timer = stun_duration
+	
+	# Cancel any ongoing dash immediately
+	if is_dashing:
+		is_dashing = false
+		dash_timer = 0.0
+		velocity = Vector2.ZERO
+	
 	# Visual feedback for stun
 	var tween = create_tween()
 	tween.tween_property(sprite, "modulate", Color.PURPLE, 0.2)
+	# Show stun indicator
+	if stun_indicator:
+		stun_indicator.visible = true
 	print("Enemy stunned for ", stun_duration, " seconds!")
 
 func die():
