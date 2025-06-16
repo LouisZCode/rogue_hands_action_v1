@@ -33,6 +33,9 @@ var retreat_timer: float = 0.0
 var last_player_stance: Player.Stance = Player.Stance.NEUTRAL
 var stance_change_cooldown: float = 0.5
 var stance_change_timer: float = 0.0
+var stance_to_dash_delay: float = 2.0  # 2 second delay after stance change
+var stance_to_dash_timer: float = 0.0
+var target_attack_position: Vector2  # Store player position when stance is selected
 
 # Immunity frames to prevent multiple hits
 @export var immunity_duration: float = 0.5
@@ -122,17 +125,16 @@ func update_ai(delta):
 			velocity = Vector2.ZERO
 			if stance_decision_timer <= 0:
 				select_tactical_stance()
+				# Start the 2-second delay before dash attack
+				stance_to_dash_timer = stance_to_dash_delay
 				current_state = AIState.ATTACKING
 			
 		AIState.ATTACKING:
-			if player_ref and current_stance != Stance.NEUTRAL:
-				var distance = global_position.distance_to(player_ref.global_position)
-				if distance <= attack_range:
-					if attack_timer <= 0:
-						perform_dash_attack()
-				else:
-					# Move closer to attack
-					chase_player()
+			# Once in attacking state, commit to the attack regardless of player position
+			if current_stance != Stance.NEUTRAL:
+				# Only attack after 2-second delay and cooldown is ready
+				if attack_timer <= 0 and stance_to_dash_timer <= 0:
+					perform_dash_attack()
 			else:
 				current_state = AIState.RETREATING
 				retreat_timer = 1.0
@@ -190,6 +192,9 @@ func select_tactical_stance():
 	if player_ref:
 		var player_stance = player_ref.current_stance
 		
+		# Store the player's position at the moment of stance selection
+		target_attack_position = player_ref.global_position
+		
 		# Strategic stance selection based on rock-paper-scissors
 		match player_stance:
 			Player.Stance.NEUTRAL:
@@ -208,6 +213,7 @@ func select_tactical_stance():
 		
 		update_visual()
 		print("Enemy selected ", Stance.keys()[current_stance], " to counter player's ", Player.Stance.keys()[player_stance])
+		print("Target locked at position: ", target_attack_position)
 
 func chase_player():
 	if player_ref:
@@ -250,9 +256,9 @@ func handle_dash_movement(delta):
 		attack_during_dash()
 
 func perform_dash_attack():
-	if player_ref and current_stance != Stance.NEUTRAL:
-		# Calculate attack direction
-		var direction = (player_ref.global_position - global_position).normalized()
+	if current_stance != Stance.NEUTRAL:
+		# Calculate attack direction using stored target position
+		var direction = (target_attack_position - global_position).normalized()
 		
 		# Start dash attack
 		is_dashing = true
@@ -274,7 +280,7 @@ func perform_dash_attack():
 		
 		# Emit attack signal
 		enemy_attack.emit(current_stance, global_position)
-		print("Enemy dash attacks with: ", Stance.keys()[current_stance])
+		print("Enemy dash attacks with: ", Stance.keys()[current_stance], " towards stored target position")
 
 func attack_during_dash():
 	if player_ref and not player_ref in players_hit_this_dash:
@@ -402,6 +408,10 @@ func update_timers(delta):
 		
 	if retreat_timer > 0:
 		retreat_timer -= delta
+		
+	# Update stance-to-dash delay timer
+	if stance_to_dash_timer > 0:
+		stance_to_dash_timer -= delta
 
 func update_visual():
 	sprite.color = stance_colors[current_stance]
@@ -434,11 +444,13 @@ func _on_detection_area_body_entered(body):
 
 func _on_detection_area_body_exited(body):
 	if body is Player:
-		player_ref = null
-		current_state = AIState.IDLE
-		current_stance = Stance.NEUTRAL
-		update_visual()
-		print("Enemy lost player - returning to idle")
+		# Don't interrupt if enemy is in attacking state (committed to attack)
+		if current_state != AIState.ATTACKING:
+			player_ref = null
+			current_state = AIState.IDLE
+			current_stance = Stance.NEUTRAL
+			update_visual()
+			print("Enemy lost player - returning to idle")
 
 func add_immunity_visual_feedback():
 	# Create flickering effect during immunity frames
