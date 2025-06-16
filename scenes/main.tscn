@@ -163,5 +163,34 @@ text = "Attack Ready"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="PlayerDefensePoints" type="HBoxContainer" parent="UILayer/HealthUI"]
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -80.0
+offset_right = 120.0
+offset_bottom = -60.0
+
+[node name="DefenseLabel" type="Label" parent="UILayer/HealthUI/PlayerDefensePoints"]
+layout_mode = 2
+text = "DEF:"
+vertical_alignment = 1
+
+[node name="DefensePoint1" type="Label" parent="UILayer/HealthUI/PlayerDefensePoints"]
+layout_mode = 2
+text = "🛡️"
+vertical_alignment = 1
+
+[node name="DefensePoint2" type="Label" parent="UILayer/HealthUI/PlayerDefensePoints"]
+layout_mode = 2
+text = "🛡️"
+vertical_alignment = 1
+
+[node name="DefensePoint3" type="Label" parent="UILayer/HealthUI/PlayerDefensePoints"]
+layout_mode = 2
+text = "🛡️"
+vertical_alignment = 1
+
 [node name="GameManager" type="Node" parent="."]
 script = ExtResource("3_game_manager")

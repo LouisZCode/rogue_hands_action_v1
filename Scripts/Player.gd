@@ -9,8 +9,12 @@ class_name Player
 # Combat variables
 enum Stance { NEUTRAL, ROCK, PAPER, SCISSORS }
 var current_stance: Stance = Stance.NEUTRAL
-var max_health: int = 100
-var current_health: int = 100
+var max_health: int = 5
+var current_health: int = 5
+
+# Defense point system
+var max_defense_points: int = 3
+var current_defense_points: int = 3
 
 # Dash variables
 var is_dashing: bool = false
@@ -25,6 +29,11 @@ var attack_cooldown_timer: float = 0.0
 @export var immunity_duration: float = 0.5
 var immunity_timer: float = 0.0
 var is_immune: bool = false
+
+# Stun system
+@export var stun_duration: float = 1.0
+var stun_timer: float = 0.0
+var is_stunned: bool = false
 
 # Track which enemies have been hit during current dash
 var enemies_hit_this_dash: Array[Node] = []
@@ -53,10 +62,13 @@ signal health_changed(new_health: int)
 signal stance_changed(new_stance: Stance)
 signal player_attack(attacker_stance: Stance, attack_position: Vector2)
 signal attack_cooldown_changed(current_cooldown: float, max_cooldown: float)
+signal defense_points_changed(current_defense: int, max_defense: int)
 
 func _ready():
 	update_stance_visual()
 	attack_area.body_entered.connect(_on_attack_area_body_entered)
+	# Emit initial defense points
+	defense_points_changed.emit(current_defense_points, max_defense_points)
 	
 func _physics_process(delta):
 	handle_movement(delta)
@@ -73,6 +85,14 @@ func _physics_process(delta):
 		if immunity_timer <= 0:
 			is_immune = false
 			# Reset visual feedback when immunity ends
+			sprite.modulate = Color.WHITE
+	
+	# Update stun timer
+	if stun_timer > 0:
+		stun_timer -= delta
+		if stun_timer <= 0:
+			is_stunned = false
+			# Reset visual feedback when stun ends
 			sprite.modulate = Color.WHITE
 	
 	# Check for attack hits during dash
@@ -118,8 +138,8 @@ func handle_movement(delta):
 	move_and_slide()
 
 func handle_input():
-	# Don't handle input during dash
-	if is_dashing:
+	# Don't handle input during dash or stun
+	if is_dashing or is_stunned:
 		return
 		
 	# Stance selection - hold keys to maintain stance
@@ -199,7 +219,9 @@ func attack_during_dash():
 	var bodies = attack_area.get_overlapping_bodies()
 	for body in bodies:
 		if body.has_method("take_damage_from_player") and not body in enemies_hit_this_dash:
-			body.take_damage_from_player(current_stance, global_position)
+			# Detect combat scenario: mutual attack or attack vs defense
+			var is_mutual_attack = detect_mutual_attack(body)
+			body.take_damage_from_player(current_stance, global_position, is_mutual_attack)
 			# Add enemy to the list of already hit enemies
 			enemies_hit_this_dash.append(body)
 
@@ -241,6 +263,21 @@ func heal(amount: int):
 	current_health = min(max_health, current_health + amount)
 	health_changed.emit(current_health)
 
+func consume_defense_point() -> bool:
+	if current_defense_points > 0:
+		current_defense_points -= 1
+		defense_points_changed.emit(current_defense_points, max_defense_points)
+		return true
+	return false
+
+func apply_stun():
+	is_stunned = true
+	stun_timer = stun_duration
+	# Visual feedback for stun
+	var tween = create_tween()
+	tween.tween_property(sprite, "modulate", Color.PURPLE, 0.2)
+	print("Player stunned for ", stun_duration, " seconds!")
+
 func die():
 	print("Player died!")
 	# Handle player death (restart game, etc.)
@@ -253,6 +290,15 @@ func add_immunity_visual_feedback():
 		flicker_tween.set_loops(int(immunity_duration * 10))  # Flicker 10 times per second
 		flicker_tween.tween_property(sprite, "modulate:a", 0.3, 0.05)
 		flicker_tween.tween_property(sprite, "modulate:a", 1.0, 0.05)
+
+func is_currently_dashing() -> bool:
+	return is_dashing
+
+func detect_mutual_attack(enemy_body) -> bool:
+	# Check if enemy is also dashing (mutual attack scenario)
+	if enemy_body.has_method("is_currently_dashing"):
+		return enemy_body.is_currently_dashing()
+	return false
 
 func _on_attack_area_body_entered(body):
 	# This is called when something enters attack range

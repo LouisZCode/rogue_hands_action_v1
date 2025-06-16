@@ -6,6 +6,9 @@ class_name GameManager
 @onready var stance_indicator: Label = $"../UILayer/HealthUI/StanceIndicator"
 @onready var attack_cooldown_bar: ProgressBar = $"../UILayer/HealthUI/AttackCooldownBar"
 @onready var cooldown_label: Label = $"../UILayer/HealthUI/CooldownLabel"
+@onready var defense_point_1: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint1"
+@onready var defense_point_2: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint2"
+@onready var defense_point_3: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint3"
 @onready var player: Player = $"../GameLayer/Player"
 @onready var enemy: Enemy = $"../GameLayer/Enemy"
 
@@ -19,16 +22,19 @@ func _ready():
 		player.stance_changed.connect(_on_player_stance_changed)
 		player.player_attack.connect(_on_player_attack)
 		player.attack_cooldown_changed.connect(_on_player_attack_cooldown_changed)
+		player.defense_points_changed.connect(_on_player_defense_points_changed)
 	
 	# Connect enemy signals  
 	if enemy:
 		enemy.enemy_died.connect(_on_enemy_died)
 		enemy.enemy_attack.connect(_on_enemy_attack)
+		enemy.enemy_defense_points_changed.connect(_on_enemy_defense_points_changed)
 	
 	# Initialize UI
-	update_player_health_ui(player.current_health if player else 100)
+	update_player_health_ui(player.current_health if player else 5)
 	update_stance_ui(player.current_stance if player else Player.Stance.ROCK)
 	update_attack_cooldown_ui(0.0, 1.0)  # Initialize cooldown bar
+	update_player_defense_points_ui(3, 3)  # Initialize defense points
 
 func _on_player_health_changed(new_health: int):
 	update_player_health_ui(new_health)
@@ -52,9 +58,16 @@ func _on_enemy_died():
 func _on_enemy_attack(attacker_stance: Enemy.Stance, attack_position: Vector2):
 	print("Enemy attacks with: ", Enemy.Stance.keys()[attacker_stance])
 
+func _on_player_defense_points_changed(current_defense: int, max_defense: int):
+	update_player_defense_points_ui(current_defense, max_defense)
+
+func _on_enemy_defense_points_changed(current_defense: int, max_defense: int):
+	# For now just print, enemy defense points visual will be added next
+	print("Enemy defense points: ", current_defense, "/", max_defense)
+
 func update_player_health_ui(health: int):
 	if player_health_bar:
-		var health_percent = float(health) / 100.0 * 100.0
+		var health_percent = float(health) / 5.0 * 100.0
 		player_health_bar.value = health_percent
 		
 		# Change health bar color
@@ -104,6 +117,19 @@ func update_attack_cooldown_ui(current_cooldown: float, max_cooldown: float):
 			cooldown_label.text = "Cooldown: %.1fs" % current_cooldown
 			attack_cooldown_bar.modulate = Color.RED
 
+func update_player_defense_points_ui(current_defense: int, max_defense: int):
+	# Update defense point visual indicators
+	var defense_points = [defense_point_1, defense_point_2, defense_point_3]
+	
+	for i in range(max_defense):
+		if i < defense_points.size() and defense_points[i]:
+			if i < current_defense:
+				defense_points[i].text = "🛡️"  # Active defense point
+				defense_points[i].modulate = Color.WHITE
+			else:
+				defense_points[i].text = "💔"  # Used defense point
+				defense_points[i].modulate = Color.GRAY
+
 func spawn_new_enemy():
 	# Create new enemy at random position
 	var enemy_scene = preload("res://scenes/Enemy.tscn")
@@ -122,6 +148,7 @@ func spawn_new_enemy():
 	# Connect signals
 	new_enemy.enemy_died.connect(_on_enemy_died)
 	new_enemy.enemy_attack.connect(_on_enemy_attack)
+	new_enemy.enemy_defense_points_changed.connect(_on_enemy_defense_points_changed)
 	
 	# Update enemy reference
 	enemy = new_enemy

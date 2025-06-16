@@ -11,8 +11,12 @@ class_name Enemy
 # Combat variables  
 enum Stance { NEUTRAL, ROCK, PAPER, SCISSORS }
 var current_stance: Stance = Stance.NEUTRAL  # Start in neutral like player
-var max_health: int = 60
-var current_health: int = 60
+var max_health: int = 5
+var current_health: int = 5
+
+# Defense point system
+var max_defense_points: int = 1
+var current_defense_points: int = 1
 
 # AI State - Enhanced tactical system
 enum AIState { IDLE, OBSERVING, POSITIONING, STANCE_SELECTION, ATTACKING, RETREATING, STUNNED }
@@ -42,6 +46,10 @@ var target_attack_position: Vector2  # Store player position when stance is sele
 var immunity_timer: float = 0.0
 var is_immune: bool = false
 
+# Stun system (enhanced existing STUNNED state)
+@export var stun_duration: float = 1.0
+var stun_timer: float = 0.0
+
 # Track which players have been hit during current dash
 var players_hit_this_dash: Array[Node] = []
 
@@ -49,6 +57,7 @@ var players_hit_this_dash: Array[Node] = []
 @onready var sprite: ColorRect = $Sprite
 @onready var stance_label: Label = $StanceLabel
 @onready var health_bar: ProgressBar = $HealthBar
+@onready var defense_point_label: Label = $DefensePoint
 @onready var detection_area: Area2D = $DetectionArea
 @onready var attack_area: Area2D = $AttackArea
 
@@ -69,12 +78,15 @@ var stance_symbols = {
 
 signal enemy_died
 signal enemy_attack(attacker_stance: Stance, attack_position: Vector2)
+signal enemy_defense_points_changed(current_defense: int, max_defense: int)
 
 func _ready():
 	update_visual()
 	detection_area.body_entered.connect(_on_detection_area_body_entered)
 	detection_area.body_exited.connect(_on_detection_area_body_exited)
 	attack_area.body_entered.connect(_on_attack_area_body_entered)
+	# Emit initial defense points
+	enemy_defense_points_changed.emit(current_defense_points, max_defense_points)
 	
 func _physics_process(delta):
 	update_ai(delta)
@@ -152,7 +164,10 @@ func update_ai(delta):
 				
 		AIState.STUNNED:
 			velocity = Vector2.ZERO
-			# Stunned state handled by timer
+			# Check if stun timer is done
+			if stun_timer <= 0:
+				current_state = AIState.RETREATING
+				retreat_timer = 1.0
 	
 	# Movement is now handled in handle_dash_movement() during dashes
 	if not is_dashing:
@@ -286,13 +301,33 @@ func attack_during_dash():
 	if player_ref and not player_ref in players_hit_this_dash:
 		var distance = global_position.distance_to(player_ref.global_position)
 		if distance <= attack_range:
-			# Deal damage based on stance matchup
-			var damage = calculate_combat_damage(current_stance, player_ref.current_stance)
-			if damage > 0:
-				player_ref.take_damage(damage)
-				# Add player to the list of already hit players
-				players_hit_this_dash.append(player_ref)
-				print("Enemy hit player for ", damage, " damage during dash")
+			# Detect combat scenario: mutual attack or attack vs defense
+			var is_mutual_attack = detect_mutual_attack_with_player()
+			# Calculate combat result based on stance matchup and scenario
+			var combat_result = calculate_combat_damage(current_stance, player_ref.current_stance, is_mutual_attack)
+			
+			# Handle defense point consumption
+			if combat_result.player_defense_consumed:
+				if player_ref.has_method("consume_defense_point"):
+					if player_ref.consume_defense_point():
+						print("Player blocked with defense point!")
+					else:
+						# No defense points left, take damage instead
+						combat_result.damage = 2
+						player_ref.take_damage(combat_result.damage)
+				else:
+					# Fallback if method doesn't exist
+					player_ref.take_damage(combat_result.damage)
+			elif combat_result.damage > 0:
+				player_ref.take_damage(combat_result.damage)
+			
+			# Handle enemy stun
+			if combat_result.enemy_stunned:
+				apply_stun()
+			
+			# Add player to the list of already hit players
+			players_hit_this_dash.append(player_ref)
+			print("Enemy attack result: ", combat_result.damage, " damage (mutual: ", is_mutual_attack, ")")
 
 func calculate_damage(attacker_stance: Stance, defender_stance: Stance) -> int:
 	# Rock-Paper-Scissors logic
@@ -305,59 +340,112 @@ func calculate_damage(attacker_stance: Stance, defender_stance: Stance) -> int:
 	else:
 		return 5   # Lose damage
 
-func calculate_combat_damage(enemy_stance: Stance, player_stance) -> int:
-	# Enemy attacks player - proper Rock-Paper-Scissors logic for all stances
-	# Enemy enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
-	# Player enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
+func calculate_combat_damage(enemy_stance: Stance, player_stance, is_mutual_attack: bool = false) -> Dictionary:
+	# Returns: {damage: int, enemy_stunned: bool, player_defense_consumed: bool}
+	var result = {"damage": 0, "enemy_stunned": false, "player_defense_consumed": false}
+	
 	var player_stance_int = int(player_stance)
 	var enemy_stance_int = int(enemy_stance)
 	
-	# Player in neutral takes base damage (will be reduced in Player.take_damage())
-	if player_stance_int == 0:
-		return 20  # Base damage for neutral stance
+	# Mutual attack scenario (both dashing)
+	if is_mutual_attack:
+		if enemy_stance_int == player_stance_int:
+			# Tie - no damage to either
+			result.damage = 0
+			return result
+		elif (enemy_stance_int == 1 and player_stance_int == 3) or \
+			 (enemy_stance_int == 2 and player_stance_int == 1) or \
+			 (enemy_stance_int == 3 and player_stance_int == 2):
+			# Enemy wins - player gets stunned, enemy deals 2 damage
+			result.damage = 2
+			return result
+		else:
+			# Enemy loses - enemy gets stunned, no damage
+			result.damage = 0
+			result.enemy_stunned = true
+			return result
 	
-	# Enemy in neutral shouldn't attack (but handle just in case)
-	if enemy_stance_int == 0:
-		return 5  # Minimal damage if somehow attacking in neutral
-	
-	# Combat logic: Full rock-paper-scissors for all enemy stances
-	if enemy_stance_int == player_stance_int:
-		return 10  # Tie damage
+	# Attack vs Defense scenario (enemy attacking, player defending)
+	if player_stance_int == 0:  # vs Neutral
+		result.damage = 1
+	elif enemy_stance_int == player_stance_int:  # Same stance defense
+		result.damage = 0
+		result.player_defense_consumed = true
 	elif (enemy_stance_int == 1 and player_stance_int == 3) or \
 		 (enemy_stance_int == 2 and player_stance_int == 1) or \
 		 (enemy_stance_int == 3 and player_stance_int == 2):
-		return 30  # Enemy wins - full damage
+		# Enemy wins
+		result.damage = 2
 	else:
-		return 5   # Enemy loses - minimal damage
+		# Enemy loses (parry) - enemy gets stunned
+		result.damage = 0
+		result.enemy_stunned = true
+	
+	return result
 
-func take_damage_from_player(player_stance, attack_position: Vector2):
-	# Convert player stance to comparable format
+func take_damage_from_player(player_stance, attack_position: Vector2, is_mutual_attack: bool = false):
+	var player_stance_int = int(player_stance)
+	var enemy_stance_int = int(current_stance)
+	
 	var damage = 0
 	var result = ""
+	var player_stunned = false
+	var enemy_defense_consumed = false
 	
-	# Proper Rock-Paper-Scissors logic using integers for all enemy stances
-	# Player enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
-	# Enemy enum: 0=NEUTRAL, 1=ROCK, 2=PAPER, 3=SCISSORS
-	var player_stance_int = int(player_stance)
-	var enemy_stance_int = int(current_stance)  # Enemy can now use any stance
-	
-	# Players in neutral stance cannot attack (this shouldn't happen due to attack restrictions)
-	if player_stance_int == 0:  # NEUTRAL
-		damage = 0
-		result = "NO DAMAGE - NEUTRAL STANCE"
-	elif player_stance_int == enemy_stance_int:  # Tie
-		damage = 10  # Tie
-		result = "TIE - " + Stance.keys()[current_stance] + " vs " + Player.Stance.keys()[player_stance]
-	elif (player_stance_int == 1 and enemy_stance_int == 3) or \
-		 (player_stance_int == 2 and enemy_stance_int == 1) or \
-		 (player_stance_int == 3 and enemy_stance_int == 2):
-		damage = 30  # Player wins
-		result = "PLAYER WINS - " + Player.Stance.keys()[player_stance] + " beats " + Stance.keys()[current_stance]
+	# Mutual attack scenario (both dashing)
+	if is_mutual_attack:
+		if player_stance_int == enemy_stance_int:
+			# Tie - no damage to either
+			damage = 0
+			result = "MUTUAL TIE - No damage"
+		elif (player_stance_int == 1 and enemy_stance_int == 3) or \
+			 (player_stance_int == 2 and enemy_stance_int == 1) or \
+			 (player_stance_int == 3 and enemy_stance_int == 2):
+			# Player wins - enemy takes 2 damage
+			damage = 2
+			result = "MUTUAL WIN - Player " + Player.Stance.keys()[player_stance] + " beats " + Stance.keys()[current_stance]
+		else:
+			# Player loses - player gets stunned, no damage to enemy
+			damage = 0
+			player_stunned = true
+			result = "MUTUAL LOSS - Player stunned by " + Stance.keys()[current_stance]
 	else:
-		damage = 5   # Player loses (reduced damage)
-		result = "PLAYER LOSES - " + Stance.keys()[current_stance] + " beats " + Player.Stance.keys()[player_stance]
+		# Attack vs Defense scenario (player attacking, enemy defending)
+		if enemy_stance_int == 0:  # Enemy in neutral
+			damage = 1
+			result = "vs NEUTRAL - 1 damage"
+		elif player_stance_int == enemy_stance_int:  # Same stance defense
+			damage = 0
+			enemy_defense_consumed = true
+			result = "BLOCKED - Enemy used defense point"
+		elif (player_stance_int == 1 and enemy_stance_int == 3) or \
+			 (player_stance_int == 2 and enemy_stance_int == 1) or \
+			 (player_stance_int == 3 and enemy_stance_int == 2):
+			# Player wins
+			damage = 2
+			result = "PLAYER WINS - " + Player.Stance.keys()[player_stance] + " beats " + Stance.keys()[current_stance]
+		else:
+			# Player loses (parry) - player gets stunned
+			damage = 0
+			player_stunned = true
+			result = "PARRY - Player stunned by " + Stance.keys()[current_stance]
 	
-	take_damage(damage)
+	# Handle defense point consumption
+	if enemy_defense_consumed:
+		if consume_defense_point():
+			print("Enemy blocked with defense point!")
+		else:
+			# No defense points left, take damage instead
+			damage = 2
+			take_damage(damage)
+	elif damage > 0:
+		take_damage(damage)
+	
+	# Handle player stun
+	if player_stunned:
+		if player_ref and player_ref.has_method("apply_stun"):
+			player_ref.apply_stun()
+	
 	print("Combat: Player ", Player.Stance.keys()[player_stance], " vs Enemy ", Stance.keys()[current_stance], " - Damage: ", damage, " - ", result)
 
 func take_damage(amount: int):
@@ -412,11 +500,16 @@ func update_timers(delta):
 	# Update stance-to-dash delay timer
 	if stance_to_dash_timer > 0:
 		stance_to_dash_timer -= delta
+	
+	# Update stun timer
+	if stun_timer > 0:
+		stun_timer -= delta
 
 func update_visual():
 	sprite.color = stance_colors[current_stance]
 	stance_label.text = stance_symbols[current_stance]
 	update_health_bar()
+	update_defense_point_visual()
 
 func update_health_bar():
 	var health_percent = float(current_health) / float(max_health) * 100.0
@@ -429,6 +522,31 @@ func update_health_bar():
 		health_bar.modulate = Color.YELLOW
 	else:
 		health_bar.modulate = Color.RED
+
+func update_defense_point_visual():
+	if defense_point_label:
+		if current_defense_points > 0:
+			defense_point_label.text = "🛡️"
+			defense_point_label.modulate = Color.WHITE
+		else:
+			defense_point_label.text = "💔"
+			defense_point_label.modulate = Color.GRAY
+
+func consume_defense_point() -> bool:
+	if current_defense_points > 0:
+		current_defense_points -= 1
+		enemy_defense_points_changed.emit(current_defense_points, max_defense_points)
+		update_defense_point_visual()
+		return true
+	return false
+
+func apply_stun():
+	current_state = AIState.STUNNED
+	stun_timer = stun_duration
+	# Visual feedback for stun
+	var tween = create_tween()
+	tween.tween_property(sprite, "modulate", Color.PURPLE, 0.2)
+	print("Enemy stunned for ", stun_duration, " seconds!")
 
 func die():
 	print("Enemy died!")
@@ -459,6 +577,15 @@ func add_immunity_visual_feedback():
 		flicker_tween.set_loops(int(immunity_duration * 10))  # Flicker 10 times per second
 		flicker_tween.tween_property(sprite, "modulate:a", 0.3, 0.05)
 		flicker_tween.tween_property(sprite, "modulate:a", 1.0, 0.05)
+
+func is_currently_dashing() -> bool:
+	return is_dashing
+
+func detect_mutual_attack_with_player() -> bool:
+	# Check if player is also dashing (mutual attack scenario)
+	if player_ref and player_ref.has_method("is_currently_dashing"):
+		return player_ref.is_currently_dashing()
+	return false
 
 func _on_attack_area_body_entered(body):
 	# Attack area entry is now handled in the tactical AI states
