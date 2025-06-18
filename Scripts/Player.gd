@@ -227,6 +227,19 @@ func change_stance(new_stance: Stance):
 		update_stance_visual()
 		stance_changed.emit(current_stance)
 
+func get_shortest_angle_difference(from_angle: float, to_angle: float) -> float:
+	# Calculate the shortest angular difference between two angles
+	# Returns a value between -180 and 180 degrees
+	var difference = to_angle - from_angle
+	
+	# Normalize to [-180, 180] range
+	while difference > 180:
+		difference -= 360
+	while difference < -180:
+		difference += 360
+	
+	return difference
+
 func get_current_input_direction() -> Vector2:
 	# Get current directional input (reused for dash attacks and stance rotation)
 	var input_direction = Vector2.ZERO
@@ -353,12 +366,15 @@ func update_animation_state(delta):
 				var input_angle = input_direction.angle()
 				var target_rotation_degrees = rad_to_deg(input_angle) + 90  # Adjust for sprite orientation
 				
-				# Smooth rotation transition for stance feedback
-				if abs(target_rotation_degrees - sprite.rotation_degrees) > 5:  # Only rotate if significant change
+				# Use shortest angle path for smooth stance rotation
+				var angle_diff = get_shortest_angle_difference(sprite.rotation_degrees, target_rotation_degrees)
+				if abs(angle_diff) > 5:  # Only rotate if significant change
+					# Use normalized target to force short path in tween
+					var normalized_target = sprite.rotation_degrees + angle_diff
 					if rotation_tween:
 						rotation_tween.kill()
 					rotation_tween = create_tween()
-					rotation_tween.tween_property(sprite, "rotation_degrees", target_rotation_degrees, stance_rotation_speed)
+					rotation_tween.tween_property(sprite, "rotation_degrees", normalized_target, stance_rotation_speed)
 			# If no input direction, maintain current rotation (don't snap back)
 	
 	# Handle directional rotation for walking (top-down perspective)
@@ -369,13 +385,16 @@ func update_animation_state(delta):
 		# Store the current movement direction for stance preservation
 		last_movement_direction = target_rotation_degrees
 		
-		# Smooth rotation transition
-		if abs(target_rotation_degrees - current_rotation) > 5:  # Only rotate if significant change
-			current_rotation = target_rotation_degrees
+		# Use shortest angle path for smooth rotation transition
+		var angle_diff = get_shortest_angle_difference(sprite.rotation_degrees, target_rotation_degrees)
+		if abs(angle_diff) > 5:  # Only rotate if significant change
+			# Use normalized target to force short path in tween
+			var normalized_target = sprite.rotation_degrees + angle_diff
+			current_rotation = target_rotation_degrees  # Update tracking variable
 			if rotation_tween:
 				rotation_tween.kill()
 			rotation_tween = create_tween()
-			rotation_tween.tween_property(sprite, "rotation_degrees", target_rotation_degrees, 0.2)
+			rotation_tween.tween_property(sprite, "rotation_degrees", normalized_target, 0.2)
 	# Note: Removed auto-return to neutral rotation - hand maintains last direction when idle
 
 func perform_dash_attack(direction: Vector2):
