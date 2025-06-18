@@ -8,7 +8,8 @@
       "Bash(godot:*)",
       "Bash(grep:*)",
       "Bash(mv:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "WebFetch(domain:forum.godotengine.org)"
     ],
     "deny": []
   }
