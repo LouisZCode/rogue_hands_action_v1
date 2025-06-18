@@ -38,8 +38,28 @@ var is_stunned: bool = false
 # Track which enemies have been hit during current dash
 var enemies_hit_this_dash: Array[Node] = []
 
+# Animation state management
+var current_animation_state: String = "idle"
+var movement_threshold: float = 10.0  # Minimum velocity to trigger walking animation
+
+# Idle bobbing effect
+var idle_bobbing_timer: float = 0.0
+var idle_bobbing_speed: float = 2.0
+var idle_bobbing_amplitude: float = 2.0
+var base_position: Vector2
+
+# Breathing animation for idle state
+var breathing_timer: float = 0.0
+var breathing_speed: float = 1.0  # Slower than bobbing for realistic breathing
+var breathing_scale_amplitude: float = 0.03  # 3% scale variation
+var base_scale: Vector2 = Vector2(0.75, 0.75)
+
+# Directional rotation
+var current_rotation: float = 0.0
+var rotation_tween: Tween
+
 # References
-@onready var sprite: Sprite2D = $Sprite
+@onready var sprite: AnimatedSprite2D = $Sprite
 @onready var stance_label: Label = $StanceLabel
 @onready var stun_indicator: Label = $StunIndicator
 @onready var attack_area: Area2D = $AttackArea
@@ -70,10 +90,16 @@ func _ready():
 	attack_area.body_entered.connect(_on_attack_area_body_entered)
 	# Emit initial defense points
 	defense_points_changed.emit(current_defense_points, max_defense_points)
+	# Store base position for bobbing effect
+	base_position = sprite.position
+	# Initialize rotation tween
+	rotation_tween = create_tween()
+	rotation_tween.kill()  # Stop it initially
 	
 func _physics_process(delta):
 	handle_movement(delta)
 	handle_input()
+	update_animation_state(delta)
 	
 	# Update attack cooldown - only recover when in neutral stance
 	if attack_cooldown_timer > 0 and current_stance == Stance.NEUTRAL:
@@ -191,18 +217,93 @@ func change_stance(new_stance: Stance):
 		stance_changed.emit(current_stance)
 
 func update_stance_visual():
-	# Update sprite texture based on stance
+	# Update animation and scale based on stance
 	match current_stance:
 		Stance.NEUTRAL:
-			sprite.texture = preload("res://assets/test_sprites/idle_player.png")
+			# Check if moving to determine idle vs walking
+			if velocity.length() > movement_threshold and not is_dashing and not is_stunned:
+				sprite.play("walking")
+				current_animation_state = "walking"
+			else:
+				sprite.play("idle")
+				current_animation_state = "idle"
 		Stance.ROCK:
-			sprite.texture = preload("res://assets/test_sprites/rock_player.png")
+			sprite.play("rock")
+			sprite.rotation_degrees = 0.0  # Reset rotation for combat clarity
+			sprite.position = base_position  # Reset position
+			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
+			current_animation_state = "rock"
 		Stance.PAPER:
-			sprite.texture = preload("res://assets/test_sprites/paper_player.png")
+			sprite.play("paper") 
+			sprite.rotation_degrees = 0.0  # Reset rotation for combat clarity
+			sprite.position = base_position  # Reset position
+			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
+			current_animation_state = "paper"
 		Stance.SCISSORS:
-			sprite.texture = preload("res://assets/test_sprites/scissor_player.png")
+			sprite.play("scissors")
+			sprite.rotation_degrees = 0.0  # Reset rotation for combat clarity
+			sprite.position = base_position  # Reset position
+			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
+			current_animation_state = "scissors"
 	
 	stance_label.text = stance_symbols[current_stance]
+
+func update_animation_state(delta):
+	# Handle animation transitions based on movement and state
+	if is_stunned or is_dashing:
+		return  # Don't change animations during special states
+	
+	if current_stance == Stance.NEUTRAL:
+		var is_moving = velocity.length() > movement_threshold
+		
+		if is_moving and current_animation_state != "walking":
+			sprite.play("walking")
+			current_animation_state = "walking"
+		elif not is_moving and current_animation_state != "idle":
+			sprite.play("idle")
+			current_animation_state = "idle"
+	
+	# Handle different animation states with appropriate scaling
+	match current_animation_state:
+		"idle":
+			# Set base scale for idle sprite (64x64)
+			base_scale = Vector2(0.75, 0.75)
+			
+			# Vertical bobbing
+			idle_bobbing_timer += delta * idle_bobbing_speed
+			var bobbing_offset = sin(idle_bobbing_timer) * idle_bobbing_amplitude
+			sprite.position = base_position + Vector2(0, bobbing_offset)
+			
+			# Breathing scale animation (expand/contract)
+			breathing_timer += delta * breathing_speed
+			var breathing_scale = 1.0 + sin(breathing_timer) * breathing_scale_amplitude
+			sprite.scale = base_scale * breathing_scale
+			
+		"walking":
+			# Set base scale for walking frames (64x64)
+			base_scale = Vector2(0.75, 0.75)
+			sprite.position = base_position
+			sprite.scale = base_scale
+			
+		"rock", "paper", "scissors":
+			# Set base scale for stance sprites (400x300)
+			base_scale = Vector2(0.12, 0.12)
+			sprite.position = base_position
+			sprite.scale = base_scale
+	
+	# Handle directional rotation for walking (top-down perspective)
+	if current_animation_state == "walking" and velocity.length() > movement_threshold:
+		var movement_angle = velocity.angle()
+		var target_rotation_degrees = rad_to_deg(movement_angle) + 90  # Adjust for sprite orientation
+		
+		# Smooth rotation transition
+		if abs(target_rotation_degrees - current_rotation) > 5:  # Only rotate if significant change
+			current_rotation = target_rotation_degrees
+			if rotation_tween:
+				rotation_tween.kill()
+			rotation_tween = create_tween()
+			rotation_tween.tween_property(sprite, "rotation_degrees", target_rotation_degrees, 0.2)
+	# Note: Removed auto-return to neutral rotation - hand maintains last direction when idle
 
 func perform_dash_attack(direction: Vector2):
 	# Start the dash
