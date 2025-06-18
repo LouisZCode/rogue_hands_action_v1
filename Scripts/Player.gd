@@ -58,6 +58,11 @@ var base_scale: Vector2 = Vector2(0.75, 0.75)
 var current_rotation: float = 0.0
 var rotation_tween: Tween
 
+# Direction preservation system
+var last_movement_direction: float = 0.0  # Preserve last walking direction
+var entering_stance_direction: float = 0.0  # Direction when entering stance
+var previous_stance: Stance = Stance.NEUTRAL  # Track stance changes
+
 # References
 @onready var sprite: AnimatedSprite2D = $Sprite
 @onready var stance_label: Label = $StanceLabel
@@ -212,9 +217,29 @@ func handle_input():
 
 func change_stance(new_stance: Stance):
 	if current_stance != new_stance:
+		# Handle direction preservation when changing stances
+		handle_stance_direction_change(current_stance, new_stance)
+		
+		previous_stance = current_stance
 		current_stance = new_stance
 		update_stance_visual()
 		stance_changed.emit(current_stance)
+
+func handle_stance_direction_change(old_stance: Stance, new_stance: Stance):
+	# Entering a stance from neutral - preserve current direction
+	if old_stance == Stance.NEUTRAL and new_stance != Stance.NEUTRAL:
+		# Use current sprite rotation if actively moving, otherwise use last movement direction
+		if velocity.length() > movement_threshold:
+			entering_stance_direction = sprite.rotation_degrees
+		else:
+			# Use last known movement direction when idle
+			entering_stance_direction = last_movement_direction
+		print("Entering stance - preserving direction: ", entering_stance_direction)
+	
+	# Exiting stance back to neutral - restore preserved direction
+	elif old_stance != Stance.NEUTRAL and new_stance == Stance.NEUTRAL:
+		# Don't immediately restore here - let update_stance_visual handle it
+		print("Exiting stance - will restore direction: ", entering_stance_direction)
 
 func update_stance_visual():
 	# Update animation and scale based on stance
@@ -227,21 +252,26 @@ func update_stance_visual():
 			else:
 				sprite.play("idle")
 				current_animation_state = "idle"
+			
+			# If we just exited a stance, restore the preserved direction
+			if previous_stance != Stance.NEUTRAL:
+				sprite.rotation_degrees = entering_stance_direction
+				print("Restored direction after exiting stance: ", entering_stance_direction)
 		Stance.ROCK:
 			sprite.play("rock")
-			sprite.rotation_degrees = 0.0  # Reset rotation for combat clarity
+			sprite.rotation_degrees = entering_stance_direction  # Preserve direction when entering stance
 			sprite.position = base_position  # Reset position
 			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
 			current_animation_state = "rock"
 		Stance.PAPER:
 			sprite.play("paper") 
-			sprite.rotation_degrees = 0.0  # Reset rotation for combat clarity
+			sprite.rotation_degrees = entering_stance_direction  # Preserve direction when entering stance
 			sprite.position = base_position  # Reset position
 			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
 			current_animation_state = "paper"
 		Stance.SCISSORS:
 			sprite.play("scissors")
-			sprite.rotation_degrees = 0.0  # Reset rotation for combat clarity
+			sprite.rotation_degrees = entering_stance_direction  # Preserve direction when entering stance
 			sprite.position = base_position  # Reset position
 			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
 			current_animation_state = "scissors"
@@ -295,6 +325,9 @@ func update_animation_state(delta):
 	if current_animation_state == "walking" and velocity.length() > movement_threshold:
 		var movement_angle = velocity.angle()
 		var target_rotation_degrees = rad_to_deg(movement_angle) + 90  # Adjust for sprite orientation
+		
+		# Store the current movement direction for stance preservation
+		last_movement_direction = target_rotation_degrees
 		
 		# Smooth rotation transition
 		if abs(target_rotation_degrees - current_rotation) > 5:  # Only rotate if significant change
