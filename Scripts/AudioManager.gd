@@ -2,10 +2,22 @@ extends Node
 class_name AudioManager
 
 # Audio management for the game
-# Placeholder for future audio implementation
+# Load audio resources
+@export var walking_sound: AudioStream = preload("res://assets/sfx/player_walking_base_sfx_01.mp3")
 
 func _ready():
 	print("AudioManager initialized - ready for sound effects")
+
+func play_walking_sound(audio_player: AudioStreamPlayer2D):
+	if audio_player and not audio_player.playing:
+		audio_player.stream = walking_sound
+		audio_player.play()
+		print("Walking sound started")
+
+func stop_walking_sound(audio_player: AudioStreamPlayer2D):
+	if audio_player and audio_player.playing:
+		audio_player.stop()
+		print("Walking sound stopped")
 
 func play_attack_sound():
 	print("Attack sound played")

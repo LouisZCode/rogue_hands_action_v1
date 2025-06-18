@@ -69,6 +69,11 @@ var previous_stance: Stance = Stance.NEUTRAL  # Track stance changes
 @onready var stance_label: Label = $StanceLabel
 @onready var stun_indicator: Label = $StunIndicator
 @onready var attack_area: Area2D = $AttackArea
+@onready var walking_audio: AudioStreamPlayer2D = $WalkingAudioPlayer
+
+# Audio management
+var audio_manager: AudioManager
+var is_walking_audio_playing: bool = false
 
 # Stance colors and symbols
 var stance_colors = {
@@ -101,6 +106,8 @@ func _ready():
 	# Initialize rotation tween
 	rotation_tween = create_tween()
 	rotation_tween.kill()  # Stop it initially
+	# Initialize audio manager
+	audio_manager = AudioManager.new()
 	
 func _physics_process(delta):
 	handle_movement(delta)
@@ -210,6 +217,11 @@ func change_stance(new_stance: Stance):
 		# Handle direction preservation when changing stances
 		handle_stance_direction_change(current_stance, new_stance)
 		
+		# Stop walking audio when entering combat stance
+		if new_stance != Stance.NEUTRAL and is_walking_audio_playing:
+			audio_manager.stop_walking_sound(walking_audio)
+			is_walking_audio_playing = false
+		
 		previous_stance = current_stance
 		current_stance = new_stance
 		update_stance_visual()
@@ -294,9 +306,17 @@ func update_animation_state(delta):
 		if is_moving and current_animation_state != "walking":
 			sprite.play("walking")
 			current_animation_state = "walking"
+			# Start walking audio
+			if not is_walking_audio_playing:
+				audio_manager.play_walking_sound(walking_audio)
+				is_walking_audio_playing = true
 		elif not is_moving and current_animation_state != "idle":
 			sprite.play("idle")
 			current_animation_state = "idle"
+			# Stop walking audio
+			if is_walking_audio_playing:
+				audio_manager.stop_walking_sound(walking_audio)
+				is_walking_audio_playing = false
 	
 	# Handle different animation states with appropriate scaling
 	match current_animation_state:
@@ -454,6 +474,11 @@ func apply_stun():
 		is_dashing = false
 		dash_timer = 0.0
 		velocity = Vector2.ZERO
+	
+	# Stop walking audio if playing
+	if is_walking_audio_playing:
+		audio_manager.stop_walking_sound(walking_audio)
+		is_walking_audio_playing = false
 	
 	# Always change to neutral stance when stunned
 	change_stance(Stance.NEUTRAL)
