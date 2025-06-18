@@ -57,6 +57,7 @@ var base_scale: Vector2 = Vector2(0.75, 0.75)
 # Directional rotation
 var current_rotation: float = 0.0
 var rotation_tween: Tween
+var stance_rotation_speed: float = 0.15  # Faster rotation for stance feedback
 
 # Direction preservation system
 var last_movement_direction: float = 0.0  # Preserve last walking direction
@@ -198,21 +199,10 @@ func handle_input():
 	
 	# Directional dash attacks - only allow if not in neutral stance and not on cooldown
 	if Input.is_action_just_pressed("attack") and current_stance != Stance.NEUTRAL and attack_cooldown_timer <= 0:
-		var attack_direction = Vector2.ZERO
-		
-		# Check for directional input
-		if Input.is_action_pressed("move_up"):
-			attack_direction.y -= 1
-		if Input.is_action_pressed("move_down"):
-			attack_direction.y += 1
-		if Input.is_action_pressed("move_left"):
-			attack_direction.x -= 1
-		if Input.is_action_pressed("move_right"):
-			attack_direction.x += 1
+		var attack_direction = get_current_input_direction()
 		
 		# If no direction pressed, don't attack
 		if attack_direction.length() > 0:
-			attack_direction = attack_direction.normalized()
 			perform_dash_attack(attack_direction)
 
 func change_stance(new_stance: Stance):
@@ -224,6 +214,21 @@ func change_stance(new_stance: Stance):
 		current_stance = new_stance
 		update_stance_visual()
 		stance_changed.emit(current_stance)
+
+func get_current_input_direction() -> Vector2:
+	# Get current directional input (reused for dash attacks and stance rotation)
+	var input_direction = Vector2.ZERO
+	
+	if Input.is_action_pressed("move_up"):
+		input_direction.y -= 1
+	if Input.is_action_pressed("move_down"):
+		input_direction.y += 1
+	if Input.is_action_pressed("move_left"):
+		input_direction.x -= 1
+	if Input.is_action_pressed("move_right"):
+		input_direction.x += 1
+	
+	return input_direction.normalized() if input_direction.length() > 0 else Vector2.ZERO
 
 func handle_stance_direction_change(old_stance: Stance, new_stance: Stance):
 	# Entering a stance from neutral - preserve current direction
@@ -320,6 +325,21 @@ func update_animation_state(delta):
 			base_scale = Vector2(0.12, 0.12)
 			sprite.position = base_position
 			sprite.scale = base_scale
+			
+			# Handle dynamic stance rotation based on input direction
+			var input_direction = get_current_input_direction()
+			if input_direction.length() > 0:
+				# Player is indicating a dash direction - rotate to face it
+				var input_angle = input_direction.angle()
+				var target_rotation_degrees = rad_to_deg(input_angle) + 90  # Adjust for sprite orientation
+				
+				# Smooth rotation transition for stance feedback
+				if abs(target_rotation_degrees - sprite.rotation_degrees) > 5:  # Only rotate if significant change
+					if rotation_tween:
+						rotation_tween.kill()
+					rotation_tween = create_tween()
+					rotation_tween.tween_property(sprite, "rotation_degrees", target_rotation_degrees, stance_rotation_speed)
+			# If no input direction, maintain current rotation (don't snap back)
 	
 	# Handle directional rotation for walking (top-down perspective)
 	if current_animation_state == "walking" and velocity.length() > movement_threshold:
