@@ -318,6 +318,23 @@ func show_damage_feedback(final_damage: int, original_damage: int):
 	apply_color_feedback(category)
 	apply_blink_feedback(category)
 	apply_screen_shake_by_category(category)
+	
+	# Spawn damage number
+	spawn_damage_number(final_damage, category, final_damage == 0)
+
+func spawn_damage_number(amount: int, category: DamageCategory, is_tie: bool = false):
+	# Load and spawn damage number scene
+	var damage_number_scene = preload("res://scenes/DamageNumber.tscn")
+	var damage_number = damage_number_scene.instantiate()
+	
+	# Add to scene tree (parent to the main scene to avoid cleanup issues)
+	get_tree().current_scene.add_child(damage_number)
+	
+	# Position above player with slight randomness
+	var spawn_position = global_position + Vector2(randf_range(-15, 15), -30)
+	
+	# Show the damage number
+	damage_number.show_damage(amount, int(category), spawn_position, is_tie)
 
 func apply_color_feedback(category: DamageCategory):
 	# Apply color flash based on damage category
@@ -624,6 +641,23 @@ func take_damage(amount: int):
 func heal(amount: int):
 	current_health = min(max_health, current_health + amount)
 	health_changed.emit(current_health)
+	
+	# Spawn healing number
+	spawn_healing_number(amount)
+
+func spawn_healing_number(amount: int):
+	# Load and spawn damage number scene for healing
+	var damage_number_scene = preload("res://scenes/DamageNumber.tscn")
+	var damage_number = damage_number_scene.instantiate()
+	
+	# Add to scene tree
+	get_tree().current_scene.add_child(damage_number)
+	
+	# Position above player
+	var spawn_position = global_position + Vector2(0, -30)
+	
+	# Show the healing number
+	damage_number.show_healing(amount, spawn_position)
 
 func consume_defense_point() -> bool:
 	if current_defense_points > 0:

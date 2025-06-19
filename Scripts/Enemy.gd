@@ -667,7 +667,8 @@ func update_timers(delta):
 	if lost_player_timer > 0:
 		lost_player_timer -= delta
 		if current_state == AIState.LOST_PLAYER:
-			print("DEBUG: Lost player timer: ", lost_player_timer)
+			pass
+			#print("DEBUG: Lost player timer: ", lost_player_timer)
 	
 	# Update alert timer
 	if alert_timer > 0:
