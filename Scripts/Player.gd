@@ -6,6 +6,11 @@ class_name Player
 @export var dash_speed: float = 600.0
 @export var dash_duration: float = 0.3
 
+# Movement interpolation
+@export var acceleration: float = 800.0  # Units per second squared (4x speed for responsive feel)
+@export var deceleration: float = 1000.0  # Units per second squared (5x speed for quick stops)
+var current_speed: float = 0.0  # Current movement speed
+
 # Combat variables
 enum Stance { NEUTRAL, ROCK, PAPER, SCISSORS }
 var current_stance: Stance = Stance.NEUTRAL
@@ -75,6 +80,13 @@ var previous_stance: Stance = Stance.NEUTRAL  # Track stance changes
 var audio_manager: AudioManager
 var is_walking_audio_playing: bool = false
 
+# Screen shake system
+var shake_duration: float = 0.0
+var shake_intensity: float = 0.0
+var shake_timer: float = 0.0
+var base_camera_position: Vector2
+@onready var camera: Camera2D = $Camera2D
+
 # Stance colors and symbols
 var stance_colors = {
 	Stance.NEUTRAL: Color.LIGHT_BLUE,
@@ -108,11 +120,14 @@ func _ready():
 	rotation_tween.kill()  # Stop it initially
 	# Initialize audio manager
 	audio_manager = AudioManager.new()
+	# Initialize camera shake system
+	base_camera_position = camera.position
 	
 func _physics_process(delta):
 	handle_movement(delta)
 	handle_input()
 	update_animation_state(delta)
+	update_screen_shake(delta)
 	
 	# Update attack cooldown - only recover when in neutral stance
 	if attack_cooldown_timer > 0 and current_stance == Stance.NEUTRAL:
@@ -145,6 +160,7 @@ func handle_movement(delta):
 	# No movement allowed when stunned
 	if is_stunned:
 		velocity = Vector2.ZERO
+		current_speed = 0.0  # Reset speed when stunned
 		move_and_slide()
 		return
 	
@@ -176,12 +192,27 @@ func handle_movement(delta):
 			# Normalize diagonal movement
 			if input_dir.length() > 0:
 				input_dir = input_dir.normalized()
-				velocity = input_dir * speed
+				
+				# Smooth acceleration toward target speed
+				var target_speed = speed
+				current_speed = move_toward(current_speed, target_speed, acceleration * delta)
+				velocity = input_dir * current_speed
+			else:
+				# Smooth deceleration when no input
+				current_speed = move_toward(current_speed, 0.0, deceleration * delta)
+				
+				# Preserve direction until fully stopped
+				if velocity.length() > 0 and current_speed > 0:
+					velocity = velocity.normalized() * current_speed
+				else:
+					velocity = Vector2.ZERO
+		else:
+			# Stop movement when in stance (with deceleration)
+			current_speed = move_toward(current_speed, 0.0, deceleration * delta)
+			if velocity.length() > 0 and current_speed > 0:
+				velocity = velocity.normalized() * current_speed
 			else:
 				velocity = Vector2.ZERO
-		else:
-			# Stop movement when in stance
-			velocity = Vector2.ZERO
 	
 	move_and_slide()
 
@@ -239,6 +270,30 @@ func get_shortest_angle_difference(from_angle: float, to_angle: float) -> float:
 		difference += 360
 	
 	return difference
+
+func start_screen_shake(intensity: float, duration: float):
+	# Start screen shake with given intensity and duration
+	shake_intensity = intensity
+	shake_duration = duration
+	shake_timer = duration
+
+func update_screen_shake(delta: float):
+	# Update screen shake effect
+	if shake_timer > 0:
+		shake_timer -= delta
+		
+		# Calculate shake offset with decreasing intensity
+		var shake_strength = shake_intensity * (shake_timer / shake_duration)
+		var shake_offset = Vector2(
+			randf_range(-shake_strength, shake_strength),
+			randf_range(-shake_strength, shake_strength)
+		)
+		
+		# Apply shake to camera
+		camera.position = base_camera_position + shake_offset
+	else:
+		# Return camera to base position when shake ends
+		camera.position = base_camera_position
 
 func get_current_input_direction() -> Vector2:
 	# Get current directional input (reused for dash attacks and stance rotation)
@@ -310,8 +365,12 @@ func update_stance_visual():
 
 func update_animation_state(delta):
 	# Handle animation transitions based on movement and state
-	if is_stunned or is_dashing:
-		return  # Don't change animations during special states
+	if is_stunned:
+		return  # Don't change animations during stunned state
+	
+	# During dash, preserve current scale and animation
+	if is_dashing:
+		return  # Don't change animations or scale during dash
 	
 	if current_stance == Stance.NEUTRAL:
 		var is_moving = velocity.length() > movement_threshold
@@ -345,19 +404,31 @@ func update_animation_state(delta):
 			# Breathing scale animation (expand/contract)
 			breathing_timer += delta * breathing_speed
 			var breathing_scale = 1.0 + sin(breathing_timer) * breathing_scale_amplitude
-			sprite.scale = base_scale * breathing_scale
+			# Only apply breathing scale if not dashing (preserve scale during dash)
+			if not is_dashing:
+				sprite.scale = base_scale * breathing_scale
 			
 		"walking":
 			# Set base scale for walking frames (64x64)
 			base_scale = Vector2(0.75, 0.75)
 			sprite.position = base_position
-			sprite.scale = base_scale
+			# Only set scale if not dashing (preserve scale during dash)
+			if not is_dashing:
+				sprite.scale = base_scale
+				print("DEBUG: Set walking scale to 0.75")
+			else:
+				print("DEBUG: Skipped walking scale change during dash, keeping: ", sprite.scale)
 			
 		"rock", "paper", "scissors":
 			# Set base scale for stance sprites (400x300)
 			base_scale = Vector2(0.12, 0.12)
 			sprite.position = base_position
-			sprite.scale = base_scale
+			# Only set scale if not dashing (preserve scale during dash)
+			if not is_dashing:
+				sprite.scale = base_scale
+				print("DEBUG: Set stance scale to 0.12")
+			else:
+				print("DEBUG: Skipped stance scale change during dash, keeping: ", sprite.scale)
 			
 			# Handle dynamic stance rotation based on input direction
 			var input_direction = get_current_input_direction()
@@ -399,6 +470,7 @@ func update_animation_state(delta):
 
 func perform_dash_attack(direction: Vector2):
 	# Start the dash
+	print("DEBUG: Starting dash, current scale: ", sprite.scale, " animation_state: ", current_animation_state)
 	is_dashing = true
 	dash_direction = direction
 	dash_timer = dash_duration
@@ -409,14 +481,11 @@ func perform_dash_attack(direction: Vector2):
 	# Clear the list of enemies hit this dash
 	enemies_hit_this_dash.clear()
 	
-	# Visual feedback for dash attack
-	var dash_color = stance_colors[current_stance].lerp(Color.WHITE, 0.5)
-	sprite.modulate = dash_color
+	# No visual color change during dash - keep sprite color clean
 	
-	# Reset color after dash and auto-return to neutral
+	# Auto-return to neutral after dash
 	var tween = create_tween()
 	tween.tween_interval(dash_duration)
-	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 	tween.tween_callback(func(): 
 		current_stance = Stance.NEUTRAL
 		update_stance_visual()
@@ -436,6 +505,8 @@ func attack_during_dash():
 			body.take_damage_from_player(current_stance, global_position, is_mutual_attack)
 			# Add enemy to the list of already hit enemies
 			enemies_hit_this_dash.append(body)
+			# Light screen shake for successful hit
+			start_screen_shake(8.0, 0.15)
 
 func take_damage(amount: int):
 	# Don't take damage if immune
@@ -450,7 +521,11 @@ func take_damage(amount: int):
 	current_health = max(0, current_health - final_damage)
 	health_changed.emit(current_health)
 	
-	# Removed hit particles for cleaner gameplay
+	# Screen shake on damage taken
+	if current_stance == Stance.NEUTRAL:
+		start_screen_shake(5.0, 0.2)  # Light shake for reduced damage
+	else:
+		start_screen_shake(15.0, 0.4)  # Medium shake for normal damage
 	
 	# Start immunity frames
 	is_immune = true
@@ -501,6 +576,10 @@ func apply_stun():
 	
 	# Always change to neutral stance when stunned
 	change_stance(Stance.NEUTRAL)
+	
+	# Ensure proper neutral scale during stun (fixes tiny sprite bug)
+	sprite.scale = Vector2(0.75, 0.75)
+	current_animation_state = "idle"
 	
 	# Visual feedback for stun
 	var tween = create_tween()
