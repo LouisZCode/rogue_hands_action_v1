@@ -295,6 +295,97 @@ func update_screen_shake(delta: float):
 		# Return camera to base position when shake ends
 		camera.position = base_camera_position
 
+enum DamageCategory { NONE, LIGHT, NORMAL, HEAVY }
+
+func get_damage_category(final_damage: int, original_damage: int) -> DamageCategory:
+	# Categorize damage for appropriate visual feedback
+	if final_damage <= 0:
+		return DamageCategory.NONE  # Perfect block or tie
+	elif final_damage <= 2 or original_damage != final_damage:  # Light damage or blocked
+		return DamageCategory.LIGHT
+	elif final_damage <= 4:
+		return DamageCategory.NORMAL
+	else:
+		return DamageCategory.HEAVY  # 5+ damage
+
+func show_damage_feedback(final_damage: int, original_damage: int):
+	# Enhanced damage feedback system with categorized responses
+	var category = get_damage_category(final_damage, original_damage)
+	
+	print("DEBUG: Damage feedback - Final:", final_damage, " Original:", original_damage, " Category:", category)
+	
+	# Apply visual feedback based on damage category
+	apply_color_feedback(category)
+	apply_blink_feedback(category)
+	apply_screen_shake_by_category(category)
+
+func apply_color_feedback(category: DamageCategory):
+	# Apply color flash based on damage category
+	var tween = create_tween()
+	
+	match category:
+		DamageCategory.NONE:
+			# White/silver flash for no damage
+			tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+			tween.tween_property(sprite, "modulate", Color.LIGHT_GRAY, 0.1)
+			tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+		DamageCategory.LIGHT:
+			# Light red flash for minimal damage
+			tween.tween_property(sprite, "modulate", Color.ORANGE_RED, 0.1)
+			tween.tween_property(sprite, "modulate", Color.LIGHT_CORAL, 0.1)
+		DamageCategory.NORMAL:
+			# Standard red flash
+			tween.tween_property(sprite, "modulate", Color.RED, 0.1)
+			tween.tween_property(sprite, "modulate", Color.PINK, 0.1)
+		DamageCategory.HEAVY:
+			# Intense red flash with longer duration
+			tween.tween_property(sprite, "modulate", Color.DARK_RED, 0.15)
+			tween.tween_property(sprite, "modulate", Color.RED, 0.15)
+			tween.tween_property(sprite, "modulate", Color.PINK, 0.1)
+
+func apply_blink_feedback(category: DamageCategory):
+	# Apply appear/disappear blinking based on damage category
+	var blink_tween = create_tween()
+	
+	match category:
+		DamageCategory.NONE:
+			# 1-2 quick blinks for no damage
+			blink_tween.tween_property(sprite, "modulate:a", 0.2, 0.05)
+			blink_tween.tween_property(sprite, "modulate:a", 1.0, 0.05)
+			blink_tween.tween_property(sprite, "modulate:a", 0.2, 0.05)
+			blink_tween.tween_property(sprite, "modulate:a", 1.0, 0.05)
+		DamageCategory.LIGHT:
+			# 2-3 rapid blinks
+			blink_tween.tween_property(sprite, "modulate:a", 0.3, 0.06)
+			blink_tween.tween_property(sprite, "modulate:a", 1.0, 0.06)
+			blink_tween.tween_property(sprite, "modulate:a", 0.3, 0.06)
+			blink_tween.tween_property(sprite, "modulate:a", 1.0, 0.06)
+			blink_tween.tween_property(sprite, "modulate:a", 0.3, 0.06)
+			blink_tween.tween_property(sprite, "modulate:a", 1.0, 0.06)
+		DamageCategory.NORMAL:
+			# 4-5 medium blinks with longer gaps
+			for i in range(4):
+				blink_tween.tween_property(sprite, "modulate:a", 0.2, 0.08)
+				blink_tween.tween_property(sprite, "modulate:a", 1.0, 0.12)
+		DamageCategory.HEAVY:
+			# 6-8 longer blinks with dramatic pauses
+			for i in range(6):
+				blink_tween.tween_property(sprite, "modulate:a", 0.1, 0.1)
+				blink_tween.tween_property(sprite, "modulate:a", 1.0, 0.15)
+
+func apply_screen_shake_by_category(category: DamageCategory):
+	# Apply screen shake based on damage category
+	match category:
+		DamageCategory.NONE:
+			# No shake for no damage
+			pass
+		DamageCategory.LIGHT:
+			start_screen_shake(3.0, 0.15)  # Very light shake
+		DamageCategory.NORMAL:
+			start_screen_shake(8.0, 0.25)  # Medium shake
+		DamageCategory.HEAVY:
+			start_screen_shake(20.0, 0.5)  # Strong shake
+
 func get_current_input_direction() -> Vector2:
 	# Get current directional input (reused for dash attacks and stance rotation)
 	var input_direction = Vector2.ZERO
@@ -415,9 +506,6 @@ func update_animation_state(delta):
 			# Only set scale if not dashing (preserve scale during dash)
 			if not is_dashing:
 				sprite.scale = base_scale
-				print("DEBUG: Set walking scale to 0.75")
-			else:
-				print("DEBUG: Skipped walking scale change during dash, keeping: ", sprite.scale)
 			
 		"rock", "paper", "scissors":
 			# Set base scale for stance sprites (400x300)
@@ -426,9 +514,6 @@ func update_animation_state(delta):
 			# Only set scale if not dashing (preserve scale during dash)
 			if not is_dashing:
 				sprite.scale = base_scale
-				print("DEBUG: Set stance scale to 0.12")
-			else:
-				print("DEBUG: Skipped stance scale change during dash, keeping: ", sprite.scale)
 			
 			# Handle dynamic stance rotation based on input direction
 			var input_direction = get_current_input_direction()
@@ -470,7 +555,6 @@ func update_animation_state(delta):
 
 func perform_dash_attack(direction: Vector2):
 	# Start the dash
-	print("DEBUG: Starting dash, current scale: ", sprite.scale, " animation_state: ", current_animation_state)
 	is_dashing = true
 	dash_direction = direction
 	dash_timer = dash_duration
@@ -514,6 +598,7 @@ func take_damage(amount: int):
 		return
 		
 	# Players in neutral stance take reduced damage (25% of original damage)
+	var original_damage = amount
 	var final_damage = amount
 	if current_stance == Stance.NEUTRAL:
 		final_damage = max(1, amount / 4)  # 25% damage, minimum 1
@@ -521,29 +606,17 @@ func take_damage(amount: int):
 	current_health = max(0, current_health - final_damage)
 	health_changed.emit(current_health)
 	
-	# Screen shake on damage taken
-	if current_stance == Stance.NEUTRAL:
-		start_screen_shake(5.0, 0.2)  # Light shake for reduced damage
-	else:
-		start_screen_shake(15.0, 0.4)  # Medium shake for normal damage
+	# Enhanced damage feedback system
+	show_damage_feedback(final_damage, original_damage)
 	
 	# Start immunity frames
 	is_immune = true
 	immunity_timer = immunity_duration
 	
-	# Visual feedback for taking damage (different color for neutral stance)
-	var tween = create_tween()
-	if current_stance == Stance.NEUTRAL:
-		# Blue flash for reduced damage in neutral stance
-		tween.tween_property(sprite, "modulate", Color.CYAN, 0.1)
-		tween.tween_property(sprite, "modulate", Color.LIGHT_BLUE, 0.1)
-	else:
-		# Red flash for normal damage
-		tween.tween_property(sprite, "modulate", Color.RED, 0.1)
-		tween.tween_property(sprite, "modulate", Color.PINK, 0.1)
-	
-	# Add immunity frame visual feedback (flickering)
-	tween.tween_callback(func(): add_immunity_visual_feedback())
+	# Add immunity frame visual feedback (flickering) - keeping this separate
+	var immunity_tween = create_tween()
+	immunity_tween.tween_interval(0.4)  # Wait for main feedback to finish
+	immunity_tween.tween_callback(func(): add_immunity_visual_feedback())
 	
 	if current_health <= 0:
 		die()
