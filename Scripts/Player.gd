@@ -25,6 +25,7 @@ var current_defense_points: int = 3
 var is_dashing: bool = false
 var dash_direction: Vector2 = Vector2.ZERO
 var dash_timer: float = 0.0
+var dash_preserved_scale: Vector2 = Vector2.ZERO  # Store scale before dash to prevent corruption
 
 # Attack cooldown - increased to 1 second for balance
 @export var attack_cooldown: float = 1.0
@@ -170,6 +171,10 @@ func handle_movement(delta):
 		if dash_timer <= 0:
 			is_dashing = false
 			velocity = Vector2.ZERO
+			# Restore preserved scale when dash ends
+			if dash_preserved_scale != Vector2.ZERO:
+				sprite.scale = dash_preserved_scale
+				dash_preserved_scale = Vector2.ZERO
 			# Auto-return to neutral stance after dash
 			change_stance(Stance.NEUTRAL)
 		else:
@@ -501,8 +506,9 @@ func update_animation_state(delta):
 	# Handle different animation states with appropriate scaling
 	match current_animation_state:
 		"idle":
-			# Set base scale for idle sprite (64x64)
-			base_scale = Vector2(0.75, 0.75)
+			# Only modify base_scale if not dashing (prevents corruption)
+			if not is_dashing:
+				base_scale = Vector2(0.75, 0.75)
 			
 			# Vertical bobbing
 			idle_bobbing_timer += delta * idle_bobbing_speed
@@ -517,16 +523,18 @@ func update_animation_state(delta):
 				sprite.scale = base_scale * breathing_scale
 			
 		"walking":
-			# Set base scale for walking frames (64x64)
-			base_scale = Vector2(0.75, 0.75)
+			# Only modify base_scale if not dashing (prevents corruption)
+			if not is_dashing:
+				base_scale = Vector2(0.75, 0.75)
 			sprite.position = base_position
 			# Only set scale if not dashing (preserve scale during dash)
 			if not is_dashing:
 				sprite.scale = base_scale
 			
 		"rock", "paper", "scissors":
-			# Set base scale for stance sprites (400x300)
-			base_scale = Vector2(0.12, 0.12)
+			# Only modify base_scale if not dashing (prevents corruption)
+			if not is_dashing:
+				base_scale = Vector2(0.12, 0.12)
 			sprite.position = base_position
 			# Only set scale if not dashing (preserve scale during dash)
 			if not is_dashing:
@@ -571,6 +579,9 @@ func update_animation_state(delta):
 	# Note: Removed auto-return to neutral rotation - hand maintains last direction when idle
 
 func perform_dash_attack(direction: Vector2):
+	# Preserve current scale before starting dash
+	dash_preserved_scale = sprite.scale
+	
 	# Start the dash
 	is_dashing = true
 	dash_direction = direction
@@ -675,6 +686,10 @@ func apply_stun():
 		is_dashing = false
 		dash_timer = 0.0
 		velocity = Vector2.ZERO
+		# Restore preserved scale when dash is cancelled by stun
+		if dash_preserved_scale != Vector2.ZERO:
+			sprite.scale = dash_preserved_scale
+			dash_preserved_scale = Vector2.ZERO
 	
 	# Stop walking audio if playing
 	if is_walking_audio_playing:

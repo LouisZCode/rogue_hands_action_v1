@@ -41,16 +41,16 @@ func show_damage(amount: int, category: int, position: Vector2, is_tie: bool = f
 					label.label_settings.font_color = Color.DARK_RED
 					label.label_settings.font_size = 56  # Doubled from 28
 		else:
-			# Blue shades for damage dealt by player
+			# King-blue shades for damage dealt by player
 			match category:
 				1: # LIGHT
-					label.label_settings.font_color = Color.LIGHT_BLUE
+					label.label_settings.font_color = Color(0.3, 0.5, 1.0)  # Light royal blue
 					label.label_settings.font_size = 36  # Doubled from 18
 				2: # NORMAL  
-					label.label_settings.font_color = Color.BLUE
+					label.label_settings.font_color = Color(0.2, 0.3, 0.9)  # King blue
 					label.label_settings.font_size = 48  # Doubled from 24
 				3: # HEAVY
-					label.label_settings.font_color = Color.DARK_BLUE
+					label.label_settings.font_color = Color(0.1, 0.2, 0.8)  # Deep royal blue
 					label.label_settings.font_size = 56  # Doubled from 28
 	
 	# Animate movement (float upward with slight random spread) - 60% closer
