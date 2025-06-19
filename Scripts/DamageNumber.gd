@@ -20,11 +20,11 @@ func show_damage(amount: int, category: int, position: Vector2, is_tie: bool = f
 	if is_tie:
 		label.text = "TIE!"
 		label.label_settings.font_color = Color.YELLOW
-		label.label_settings.font_size = 20
+		label.label_settings.font_size = 40  # Doubled from 20
 	elif amount <= 0:
 		label.text = "BLOCK!"
 		label.label_settings.font_color = Color.CYAN
-		label.label_settings.font_size = 18
+		label.label_settings.font_size = 36  # Doubled from 18
 	else:
 		label.text = str(amount)
 		# Color based on damage category and direction
@@ -33,29 +33,29 @@ func show_damage(amount: int, category: int, position: Vector2, is_tie: bool = f
 			match category:
 				1: # LIGHT
 					label.label_settings.font_color = Color.ORANGE_RED
-					label.label_settings.font_size = 18
+					label.label_settings.font_size = 36  # Doubled from 18
 				2: # NORMAL  
 					label.label_settings.font_color = Color.RED
-					label.label_settings.font_size = 24
+					label.label_settings.font_size = 48  # Doubled from 24
 				3: # HEAVY
 					label.label_settings.font_color = Color.DARK_RED
-					label.label_settings.font_size = 28
+					label.label_settings.font_size = 56  # Doubled from 28
 		else:
 			# Blue shades for damage dealt by player
 			match category:
 				1: # LIGHT
 					label.label_settings.font_color = Color.LIGHT_BLUE
-					label.label_settings.font_size = 18
+					label.label_settings.font_size = 36  # Doubled from 18
 				2: # NORMAL  
 					label.label_settings.font_color = Color.BLUE
-					label.label_settings.font_size = 24
+					label.label_settings.font_size = 48  # Doubled from 24
 				3: # HEAVY
 					label.label_settings.font_color = Color.DARK_BLUE
-					label.label_settings.font_size = 28
+					label.label_settings.font_size = 56  # Doubled from 28
 	
-	# Animate movement (float upward with slight random spread)
-	var random_x_offset = randf_range(-20, 20)
-	var target_position = global_position + Vector2(random_x_offset, -80)
+	# Animate movement (float upward with slight random spread) - 60% closer
+	var random_x_offset = randf_range(-8, 8)  # Reduced from ±20 to ±8
+	var target_position = global_position + Vector2(random_x_offset, -32)  # Reduced from -80 to -32
 	
 	movement_tween = create_tween()
 	movement_tween.set_ease(Tween.EASE_OUT)
@@ -74,10 +74,10 @@ func show_healing(amount: int, position: Vector2):
 	# Configure for healing
 	label.text = "+" + str(amount)
 	label.label_settings.font_color = Color.GREEN
-	label.label_settings.font_size = 20
+	label.label_settings.font_size = 40  # Doubled from 20
 	
-	# Animate movement (float upward)
-	var target_position = global_position + Vector2(0, -60)
+	# Animate movement (float upward) - 60% closer
+	var target_position = global_position + Vector2(0, -24)  # Reduced from -60 to -24
 	
 	movement_tween = create_tween()
 	movement_tween.set_ease(Tween.EASE_OUT)

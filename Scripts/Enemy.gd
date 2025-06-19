@@ -712,7 +712,7 @@ func update_visual():
 		Stance.SCISSORS:
 			sprite.texture = preload("res://assets/test_sprites/scissor_enemy.png")
 	
-	stance_label.text = stance_symbols[current_stance]
+	# stance_label.text = stance_symbols[current_stance]  # Disabled stance emoji display
 	update_health_bar()
 	update_defense_point_visual()
 

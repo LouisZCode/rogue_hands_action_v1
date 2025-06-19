@@ -469,7 +469,7 @@ func update_stance_visual():
 			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
 			current_animation_state = "scissors"
 	
-	stance_label.text = stance_symbols[current_stance]
+	# stance_label.text = stance_symbols[current_stance]  # Disabled stance emoji display
 
 func update_animation_state(delta):
 	# Handle animation transitions based on movement and state
