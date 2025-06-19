@@ -463,7 +463,8 @@ func attack_during_dash():
 				# Create parry particle effect at enemy position
 				var game_manager = get_tree().get_first_node_in_group("game_manager")
 				if game_manager and game_manager.particle_manager:
-					game_manager.particle_manager.create_parry_effect(global_position)
+					# game_manager.particle_manager.create_parry_effect(global_position)  # Disabled for cleaner combat
+					pass
 			
 			# Add player to the list of already hit players
 			players_hit_this_dash.append(player_ref)
@@ -588,9 +589,33 @@ func take_damage_from_player(player_stance, attack_position: Vector2, is_mutual_
 			# Create parry particle effect at player position
 			var game_manager = get_tree().get_first_node_in_group("game_manager")
 			if game_manager and game_manager.particle_manager:
-				game_manager.particle_manager.create_parry_effect(player_ref.global_position)
+				# game_manager.particle_manager.create_parry_effect(player_ref.global_position)  # Disabled for cleaner combat
+				pass
 	
 	print("Combat: Player ", Player.Stance.keys()[player_stance], " vs Enemy ", Stance.keys()[current_stance], " - Damage: ", damage, " - ", result)
+
+func spawn_damage_number(amount: int):
+	# Load and spawn damage number scene for enemy taking damage (blue numbers)
+	var damage_number_scene = preload("res://scenes/DamageNumber.tscn")
+	var damage_number = damage_number_scene.instantiate()
+	
+	# Add to scene tree
+	get_tree().current_scene.add_child(damage_number)
+	
+	# Position above enemy with slight randomness
+	var spawn_position = global_position + Vector2(randf_range(-15, 15), -30)
+	
+	# Determine damage category for blue coloring
+	var category = 2  # Default to NORMAL category
+	if amount <= 2:
+		category = 1  # LIGHT
+	elif amount <= 4:
+		category = 2  # NORMAL
+	else:
+		category = 3  # HEAVY
+	
+	# Show blue damage number (is_player_taking_damage = false)
+	damage_number.show_damage(amount, category, spawn_position, false, false)
 
 func take_damage(amount: int):
 	# Don't take damage if immune
@@ -600,7 +625,8 @@ func take_damage(amount: int):
 	current_health = max(0, current_health - amount)
 	update_health_bar()
 	
-	# Removed hit particles for cleaner gameplay
+	# Spawn blue damage number (player dealing damage to enemy)
+	spawn_damage_number(amount)
 	
 	# Start immunity frames
 	is_immune = true

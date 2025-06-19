@@ -333,8 +333,8 @@ func spawn_damage_number(amount: int, category: DamageCategory, is_tie: bool = f
 	# Position above player with slight randomness
 	var spawn_position = global_position + Vector2(randf_range(-15, 15), -30)
 	
-	# Show the damage number
-	damage_number.show_damage(amount, int(category), spawn_position, is_tie)
+	# Show the damage number (player taking damage = red)
+	damage_number.show_damage(amount, int(category), spawn_position, is_tie, true)
 
 func apply_color_feedback(category: DamageCategory):
 	# Apply color flash based on damage category

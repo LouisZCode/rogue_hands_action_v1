@@ -12,7 +12,7 @@ func _ready():
 	timer.timeout.connect(_on_timer_timeout)
 	timer.start()
 
-func show_damage(amount: int, category: int, position: Vector2, is_tie: bool = false):
+func show_damage(amount: int, category: int, position: Vector2, is_tie: bool = false, is_player_taking_damage: bool = true):
 	# Set position
 	global_position = position
 	
@@ -27,17 +27,31 @@ func show_damage(amount: int, category: int, position: Vector2, is_tie: bool = f
 		label.label_settings.font_size = 18
 	else:
 		label.text = str(amount)
-		# Color based on damage category
-		match category:
-			1: # LIGHT
-				label.label_settings.font_color = Color.ORANGE
-				label.label_settings.font_size = 18
-			2: # NORMAL  
-				label.label_settings.font_color = Color.RED
-				label.label_settings.font_size = 24
-			3: # HEAVY
-				label.label_settings.font_color = Color.DARK_RED
-				label.label_settings.font_size = 28
+		# Color based on damage category and direction
+		if is_player_taking_damage:
+			# Red shades for damage taken by player
+			match category:
+				1: # LIGHT
+					label.label_settings.font_color = Color.ORANGE_RED
+					label.label_settings.font_size = 18
+				2: # NORMAL  
+					label.label_settings.font_color = Color.RED
+					label.label_settings.font_size = 24
+				3: # HEAVY
+					label.label_settings.font_color = Color.DARK_RED
+					label.label_settings.font_size = 28
+		else:
+			# Blue shades for damage dealt by player
+			match category:
+				1: # LIGHT
+					label.label_settings.font_color = Color.LIGHT_BLUE
+					label.label_settings.font_size = 18
+				2: # NORMAL  
+					label.label_settings.font_color = Color.BLUE
+					label.label_settings.font_size = 24
+				3: # HEAVY
+					label.label_settings.font_color = Color.DARK_BLUE
+					label.label_settings.font_size = 28
 	
 	# Animate movement (float upward with slight random spread)
 	var random_x_offset = randf_range(-20, 20)
