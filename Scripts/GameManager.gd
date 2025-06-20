@@ -9,8 +9,12 @@ class_name GameManager
 @onready var defense_point_1: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint1"
 @onready var defense_point_2: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint2"
 @onready var defense_point_3: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint3"
+@onready var player_hearts_container: HBoxContainer = $"../UILayer/HealthUI/PlayerHearts"
 @onready var player: Player = $"../GameLayer/Player"
 @onready var enemy: Enemy = $"../GameLayer/Enemy"
+
+# Heart management
+var heart_labels: Array[Label] = []
 
 # Particle manager reference
 var particle_manager: ParticleManager
@@ -45,9 +49,12 @@ func _ready():
 	update_stance_ui(player.current_stance if player else Player.Stance.ROCK)
 	update_attack_cooldown_ui(0.0, 1.0)  # Initialize cooldown bar
 	update_player_defense_points_ui(3, 3)  # Initialize defense points
+	# Initialize hearts based on player's max health
+	initialize_hearts(player.max_health if player else 5)
 
 func _on_player_health_changed(new_health: int):
 	update_player_health_ui(new_health)
+	update_hearts_display(new_health)
 
 func _on_player_stance_changed(new_stance: Player.Stance):
 	update_stance_ui(new_stance)
@@ -145,6 +152,25 @@ func update_player_defense_points_ui(current_defense: int, max_defense: int):
 			else:
 				defense_points[i].text = "💔"  # Used defense point
 				defense_points[i].modulate = Color.GRAY
+
+func initialize_hearts(max_health: int):
+	# Create heart labels dynamically based on max health
+	for i in range(max_health):
+		var heart_label = Label.new()
+		heart_label.text = "❤️"
+		heart_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		player_hearts_container.add_child(heart_label)
+		heart_labels.append(heart_label)
+
+func update_hearts_display(current_health: int):
+	# Update heart visibility based on current health
+	for i in range(heart_labels.size()):
+		if heart_labels[i]:
+			if i < current_health:
+				heart_labels[i].visible = true
+				heart_labels[i].modulate = Color.WHITE
+			else:
+				heart_labels[i].visible = false
 
 func spawn_new_enemy():
 	# Create new enemy at random position

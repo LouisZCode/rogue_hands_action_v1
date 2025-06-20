@@ -78,3 +78,6 @@ Enemy states: IDLE, WALKING, LOST_PLAYER, ALERT, OBSERVING, POSITIONING, STANCE_
 - Player sprites: 48x48 effective size (400x300 scaled to 0.12)
 - Enemy sprites: 42x42 effective size (400x300 scaled to 0.105)
 - Pixel art import: `texture_filter=0` for crisp rendering
+
+## Development Workflow
+- After every feature done, let me know you finished by playing the notification in global memory and waiting for me to test

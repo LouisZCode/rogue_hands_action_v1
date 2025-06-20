@@ -82,6 +82,7 @@ var previous_stance: Stance = Stance.NEUTRAL  # Track stance changes
 @onready var attack_area: Area2D = $AttackArea
 @onready var walking_audio: AudioStreamPlayer2D = $WalkingAudioPlayer
 @onready var parry_circle: ParryCircle = $ParryCircle
+@onready var defense_circles: DefenseCircles = $DefenseCircles
 
 # Audio management
 var audio_manager: AudioManager
@@ -135,6 +136,10 @@ func _ready():
 	# Initialize parry circle as hidden
 	if parry_circle:
 		parry_circle.hide_parry_circle()
+	# Initialize defense circles as hidden (only show in combat stances)
+	if defense_circles:
+		defense_circles.update_defense_points(current_defense_points)
+		defense_circles.hide_defense_circles()
 	
 func _physics_process(delta):
 	handle_movement(delta)
@@ -277,8 +282,14 @@ func change_stance(new_stance: Stance):
 		# Start parry window when entering non-neutral stance
 		if new_stance != Stance.NEUTRAL:
 			start_parry_window()
+			# Show defense circles during combat stances
+			if defense_circles:
+				defense_circles.show_defense_circles()
 		else:
 			stop_parry_window()
+			# Hide defense circles when returning to neutral
+			if defense_circles:
+				defense_circles.hide_defense_circles()
 		
 		# Play stance change sound
 		if audio_manager and walking_audio:
@@ -706,6 +717,9 @@ func consume_defense_point() -> bool:
 	if current_defense_points > 0:
 		current_defense_points -= 1
 		defense_points_changed.emit(current_defense_points, max_defense_points)
+		# Update defense circles visual
+		if defense_circles:
+			defense_circles.update_defense_points(current_defense_points)
 		# Play defense point consumed sound
 		if audio_manager and walking_audio:
 			audio_manager.play_defense_point_consumed_sfx(walking_audio)
