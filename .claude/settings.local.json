@@ -9,7 +9,8 @@
       "Bash(grep:*)",
       "Bash(mv:*)",
       "Bash(rg:*)",
-      "WebFetch(domain:forum.godotengine.org)"
+      "WebFetch(domain:forum.godotengine.org)",
+      "Bash(afplay:*)"
     ],
     "deny": []
   }

@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://cjiqmqioy28mj" path="res://assets/test_sprites/rock_player.png" id="4_rock_sprite"]
 [ext_resource type="Texture2D" uid="uid://bop4ojmhq27k" path="res://assets/test_sprites/paper_player.png" id="5_paper_sprite"]
 [ext_resource type="Texture2D" uid="uid://bq1lqhmsxtyx3" path="res://assets/test_sprites/scissor_player.png" id="6_scissor_sprite"]
+[ext_resource type="Script" path="res://Scripts/ParryCircle.gd" id="7_parry_script"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_70d11"]
 atlas = ExtResource("3_walk_spritesheet")
@@ -173,14 +174,11 @@ vertical_alignment = 1
 [node name="WalkingAudioPlayer" type="AudioStreamPlayer2D" parent="."]
 volume_db = -10.0
 
-[node name="ParryCircle" type="Label" parent="."]
+[node name="ParryCircle" type="Control" parent="."]
 visible = false
-position = Vector2(-35, -35)
-size = Vector2(70, 70)
-scale = Vector2(5, 5)
-text = "🟢"
-horizontal_alignment = 1
-vertical_alignment = 1
+position = Vector2(-50, -50)
+size = Vector2(100, 100)
+script = ExtResource("7_parry_script")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 limit_left = -450
