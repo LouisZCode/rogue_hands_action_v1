@@ -8,6 +8,9 @@ class_name Enemy
 @export var dash_speed: float = 300.0  # Half of player dash speed
 @export var dash_duration: float = 0.3
 
+# Debug/Testing variables
+@export var debug_rock_only: bool = true  # For combat testing - enemy only uses Rock
+
 # Combat variables  
 enum Stance { NEUTRAL, ROCK, PAPER, SCISSORS }
 var current_stance: Stance = Stance.NEUTRAL  # Start in neutral like player
