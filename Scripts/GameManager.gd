@@ -163,14 +163,17 @@ func initialize_hearts(max_health: int):
 		heart_labels.append(heart_label)
 
 func update_hearts_display(current_health: int):
-	# Update heart visibility based on current health
+	# Update heart display based on current health (show broken hearts for missing health)
 	for i in range(heart_labels.size()):
 		if heart_labels[i]:
 			if i < current_health:
-				heart_labels[i].visible = true
+				heart_labels[i].text = "❤️"  # Full heart
 				heart_labels[i].modulate = Color.WHITE
+				heart_labels[i].visible = true
 			else:
-				heart_labels[i].visible = false
+				heart_labels[i].text = "💔"  # Broken heart
+				heart_labels[i].modulate = Color.GRAY
+				heart_labels[i].visible = true
 
 func spawn_new_enemy():
 	# Create new enemy at random position

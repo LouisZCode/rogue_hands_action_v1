@@ -148,6 +148,10 @@ func _physics_process(delta):
 	update_screen_shake(delta)
 	update_parry_window(delta)
 	
+	# Safety check for defense circles visibility
+	if defense_circles:
+		defense_circles.validate_visibility_state(Stance.keys()[current_stance])
+	
 	# Update attack cooldown - only recover when in neutral stance
 	if attack_cooldown_timer > 0 and current_stance == Stance.NEUTRAL:
 		attack_cooldown_timer -= delta
@@ -284,11 +288,13 @@ func change_stance(new_stance: Stance):
 			start_parry_window()
 			# Show defense circles during combat stances
 			if defense_circles:
+				print("DEBUG: Player changing to combat stance: ", Stance.keys()[new_stance], " - showing defense circles")
 				defense_circles.show_defense_circles()
 		else:
 			stop_parry_window()
 			# Hide defense circles when returning to neutral
 			if defense_circles:
+				print("DEBUG: Player changing to NEUTRAL stance - hiding defense circles")
 				defense_circles.hide_defense_circles()
 		
 		# Play stance change sound

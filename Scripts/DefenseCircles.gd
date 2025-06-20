@@ -10,6 +10,10 @@ var max_defense_points: int = 3
 # Animation variables for fading circles
 var fading_circles: Array[Dictionary] = []  # Store fading circle data
 
+# Debug state tracking
+var should_be_visible: bool = false
+var debug_enabled: bool = true
+
 func _draw():
 	if visible:
 		# Draw current defense point circles
@@ -63,8 +67,40 @@ func remove_fade_circle(fade_data: Dictionary):
 	queue_redraw()
 
 func show_defense_circles():
+	should_be_visible = true
 	visible = true
+	if debug_enabled:
+		print("DEBUG: DefenseCircles.show_defense_circles() called - visible=", visible, " should_be_visible=", should_be_visible)
 	queue_redraw()
 
 func hide_defense_circles():
+	should_be_visible = false
 	visible = false
+	if debug_enabled:
+		print("DEBUG: DefenseCircles.hide_defense_circles() called - visible=", visible, " should_be_visible=", should_be_visible)
+
+func _ready():
+	# Initialize debug state
+	should_be_visible = false
+	visible = false
+	if debug_enabled:
+		print("DEBUG: DefenseCircles._ready() - initialized as hidden")
+
+func validate_visibility_state(player_stance_name: String):
+	# Safety check to ensure visibility matches expected state
+	var is_combat_stance = (player_stance_name != "NEUTRAL")
+	
+	if is_combat_stance and not should_be_visible:
+		if debug_enabled:
+			print("DEBUG: MISMATCH - In combat stance (", player_stance_name, ") but circles should not be visible!")
+		show_defense_circles()
+	elif not is_combat_stance and should_be_visible:
+		if debug_enabled:
+			print("DEBUG: MISMATCH - In neutral stance but circles should be visible!")
+		hide_defense_circles()
+	
+	# Additional check for visibility vs should_be_visible mismatch
+	if visible != should_be_visible:
+		if debug_enabled:
+			print("DEBUG: VISIBILITY MISMATCH - visible=", visible, " should_be_visible=", should_be_visible, " stance=", player_stance_name)
+		visible = should_be_visible
