@@ -42,7 +42,9 @@ The combat system recognizes two distinct scenarios:
 1. **vs Neutral Stance**: 1 damage (reduced by neutral stance defense)
 2. **Perfect Parry**: 0 damage, attacker stunned (within 0.5s parry window)
 3. **Regular Block**: 0 damage, defender loses 1 defense point (outside parry window)
-4. **Same Stance Defense**: 0 damage, defender loses 1 defense point
+4. **Same Stance Defense**: 
+   - With defense points: 0 damage, defender loses 1 defense point
+   - Without defense points: 1 damage (balanced tie damage)
 5. **Win (attacker stronger stance)**: 2 damage
 
 ### Scenario 2: Mutual Attacks
@@ -231,3 +233,32 @@ The combat system recognizes two distinct scenarios:
 - Robust cooldown and timing systems
 
 This combat system provides deep tactical gameplay while maintaining accessibility through clear visual feedback and intuitive controls.
+
+## Combat Balance & Testing
+
+### Damage Balance Philosophy
+- **Ties should feel like ties**: Same-stance encounters result in minimal damage
+- **Defense points are valuable**: Having defense points provides significant advantage
+- **Resource management matters**: Running out of defense points has consequences but not devastating
+
+### Balance Changes Made
+**v1.1 - Same-Stance Balance Fix**
+- **Issue**: Same stance defense without defense points dealt 2 damage (too harsh for a "tie")
+- **Fix**: Reduced to 1 damage for better balance
+- **Rationale**: Rock vs Rock should never be as punishing as Rock vs Scissors
+
+### Testing Mode Features
+- **Enemy Rock-Only Mode**: `debug_rock_only = true` in Enemy.gd
+- **Visual Attack Timer**: Progress bar above enemy during attack countdown
+- **Purpose**: Perfect timing practice and balance testing
+
+### Quick Reference - Damage Table
+
+| Scenario | With Defense Points | Without Defense Points |
+|----------|-------------------|----------------------|
+| Same Stance (Rock vs Rock) | 0 damage, -1 defense | 1 damage |
+| Winning (Rock vs Scissors) | 2 damage | 2 damage |
+| Losing (Scissors vs Rock) | Perfect Parry (0 dmg + stun) | Perfect Parry (0 dmg + stun) |
+| vs Neutral | 1 damage | 1 damage |
+| Mutual Same Stance | 0 damage | 0 damage |
+| Mutual Winner | 2 damage + stun loser | 2 damage + stun loser |

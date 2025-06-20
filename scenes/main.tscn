@@ -17,7 +17,7 @@ size = Vector2(50, 50)
 [node name="Main" type="Node2D"]
 
 [node name="RoomTest2" type="Sprite2D" parent="."]
-position = Vector2(0.999968, 0.999985)
+position = Vector2(-3.20077e-05, 1.99998)
 scale = Vector2(1.4725, 1.55667)
 texture = ExtResource("1_jyhfs")
 

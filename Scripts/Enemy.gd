@@ -85,6 +85,7 @@ var players_hit_this_dash: Array[Node] = []
 @onready var detection_area: Area2D = $DetectionArea
 @onready var attack_area: Area2D = $AttackArea
 @onready var audio_player: AudioStreamPlayer2D = $AudioPlayer
+@onready var attack_timer_bar: ProgressBar = $AttackTimerBar
 
 # Audio management
 var audio_manager: AudioManager
@@ -140,6 +141,8 @@ func _ready():
 		lost_indicator.visible = false
 	if alert_indicator:
 		alert_indicator.visible = false
+	if attack_timer_bar:
+		attack_timer_bar.visible = false
 	
 func _physics_process(delta):
 	update_ai(delta)
@@ -249,6 +252,9 @@ func update_ai(delta):
 			else:
 				current_state = AIState.RETREATING
 				retreat_timer = 1.0
+				# Hide attack timer when exiting attacking state
+				if attack_timer_bar:
+					attack_timer_bar.visible = false
 				
 		AIState.RETREATING:
 			# Move away and return to neutral
@@ -375,7 +381,15 @@ func select_tactical_stance():
 		# Store the player's position at the moment of stance selection
 		target_attack_position = player_ref.global_position
 		
-		# Strategic stance selection based on rock-paper-scissors
+		# Debug mode: Always use Rock for testing
+		if debug_rock_only:
+			current_stance = Stance.ROCK
+			update_visual()
+			print("Enemy selected ROCK (debug mode) vs player's ", Player.Stance.keys()[player_stance])
+			print("Target locked at position: ", target_attack_position)
+			return
+		
+		# Strategic stance selection based on rock-paper-scissors (disabled in debug mode)
 		match player_stance:
 			Player.Stance.NEUTRAL:
 				# Player is defensive, choose random attacking stance
@@ -497,8 +511,8 @@ func attack_during_dash():
 						if player_ref.audio_manager and player_ref.walking_audio:
 							player_ref.audio_manager.play_regular_block_sfx(player_ref.walking_audio)
 					else:
-						# No defense points left, take damage instead
-						combat_result.damage = 2
+						# No defense points left, take damage instead (reduced for same-stance balance)
+						combat_result.damage = 1
 						player_ref.take_damage(combat_result.damage)
 				else:
 					# Fallback if method doesn't exist
@@ -637,8 +651,8 @@ func take_damage_from_player(player_stance, attack_position: Vector2, is_mutual_
 		if consume_defense_point():
 			print("Enemy blocked with defense point!")
 		else:
-			# No defense points left, take damage instead
-			damage = 2
+			# No defense points left, take damage instead (reduced for same-stance balance)
+			damage = 1
 			take_damage(damage)
 	elif damage > 0:
 		take_damage(damage)
@@ -737,6 +751,22 @@ func update_timers(delta):
 	# Update stance-to-dash delay timer
 	if stance_to_dash_timer > 0:
 		stance_to_dash_timer -= delta
+		
+		# Update attack timer bar during ATTACKING state
+		if current_state == AIState.ATTACKING and attack_timer_bar:
+			attack_timer_bar.visible = true
+			var progress = 1.0 - (stance_to_dash_timer / stance_to_dash_delay)
+			attack_timer_bar.value = progress
+			
+			# Color feedback: Red while charging, Green when about to attack
+			if stance_to_dash_timer > 0.5:
+				attack_timer_bar.modulate = Color.RED
+			else:
+				attack_timer_bar.modulate = Color.ORANGE
+	else:
+		# Hide timer bar when not in attacking countdown
+		if attack_timer_bar and current_state != AIState.ATTACKING:
+			attack_timer_bar.visible = false
 	
 	# Update stun timer
 	if stun_timer > 0:
