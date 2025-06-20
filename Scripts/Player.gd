@@ -41,6 +41,11 @@ var is_immune: bool = false
 var stun_timer: float = 0.0
 var is_stunned: bool = false
 
+# Parry window system
+@export var parry_window_duration: float = 1.0
+var parry_window_timer: float = 0.0
+var is_parry_window_active: bool = false
+
 # Track which enemies have been hit during current dash
 var enemies_hit_this_dash: Array[Node] = []
 
@@ -76,6 +81,7 @@ var previous_stance: Stance = Stance.NEUTRAL  # Track stance changes
 @onready var stun_indicator: Label = $StunIndicator
 @onready var attack_area: Area2D = $AttackArea
 @onready var walking_audio: AudioStreamPlayer2D = $WalkingAudioPlayer
+@onready var parry_circle: Label = $ParryCircle
 
 # Audio management
 var audio_manager: AudioManager
@@ -123,12 +129,16 @@ func _ready():
 	audio_manager = AudioManager.new()
 	# Initialize camera shake system
 	base_camera_position = camera.position
+	# Initialize parry circle as hidden
+	if parry_circle:
+		parry_circle.visible = false
 	
 func _physics_process(delta):
 	handle_movement(delta)
 	handle_input()
 	update_animation_state(delta)
 	update_screen_shake(delta)
+	update_parry_window(delta)
 	
 	# Update attack cooldown - only recover when in neutral stance
 	if attack_cooldown_timer > 0 and current_stance == Stance.NEUTRAL:
@@ -260,6 +270,13 @@ func change_stance(new_stance: Stance):
 		
 		previous_stance = current_stance
 		current_stance = new_stance
+		
+		# Start parry window when entering non-neutral stance
+		if new_stance != Stance.NEUTRAL:
+			start_parry_window()
+		else:
+			stop_parry_window()
+		
 		update_stance_visual()
 		stance_changed.emit(current_stance)
 
@@ -736,3 +753,41 @@ func detect_mutual_attack(enemy_body) -> bool:
 func _on_attack_area_body_entered(body):
 	# This is called when something enters attack range
 	pass
+
+func start_parry_window():
+	# Start the parry window timer and show visual indicator
+	is_parry_window_active = true
+	parry_window_timer = parry_window_duration
+	if parry_circle:
+		parry_circle.visible = true
+		parry_circle.modulate = Color(0, 1, 0, 0.5)  # Semi-transparent green
+		parry_circle.scale = Vector2(1.0, 1.0)
+
+func stop_parry_window():
+	# Stop the parry window and hide visual indicator
+	is_parry_window_active = false
+	parry_window_timer = 0.0
+	if parry_circle:
+		parry_circle.visible = false
+
+func update_parry_window(delta):
+	# Update parry window timer and visual feedback
+	if is_parry_window_active and parry_window_timer > 0:
+		parry_window_timer -= delta
+		
+		# Update visual indicator based on remaining time
+		if parry_circle and parry_circle.visible:
+			var time_ratio = parry_window_timer / parry_window_duration
+			# Fade out the circle as time runs out
+			parry_circle.modulate.a = time_ratio * 0.5  # Max alpha of 0.5
+			# Optionally shrink the circle as well
+			var scale_factor = 0.5 + (time_ratio * 0.5)  # Scale from 0.5 to 1.0
+			parry_circle.scale = Vector2(scale_factor, scale_factor)
+		
+		# Stop parry window when timer expires
+		if parry_window_timer <= 0:
+			stop_parry_window()
+
+func is_in_parry_window() -> bool:
+	# Check if player is currently in the parry window
+	return is_parry_window_active and parry_window_timer > 0

@@ -173,6 +173,15 @@ vertical_alignment = 1
 [node name="WalkingAudioPlayer" type="AudioStreamPlayer2D" parent="."]
 volume_db = -10.0
 
+[node name="ParryCircle" type="Label" parent="."]
+visible = false
+position = Vector2(-35, -35)
+size = Vector2(70, 70)
+scale = Vector2(5, 5)
+text = "🟢"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="Camera2D" type="Camera2D" parent="."]
 limit_left = -450
 limit_top = -350

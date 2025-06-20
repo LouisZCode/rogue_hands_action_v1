@@ -1,0 +1,1 @@
+- after implementing a feature, ask the user to test it before continuing. Continue to the next feature if the feature is approved by the user after the test
