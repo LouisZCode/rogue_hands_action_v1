@@ -83,6 +83,7 @@ var previous_stance: Stance = Stance.NEUTRAL  # Track stance changes
 @onready var walking_audio: AudioStreamPlayer2D = $WalkingAudioPlayer
 @onready var parry_circle: ParryCircle = $ParryCircle
 @onready var defense_circles: DefenseCircles = $DefenseCircles
+@onready var attack_cooldown_bar: ProgressBar = $AttackCooldownBar
 
 # Audio management
 var audio_manager: AudioManager
@@ -140,6 +141,9 @@ func _ready():
 	if defense_circles:
 		defense_circles.update_defense_points(current_defense_points)
 		defense_circles.hide_defense_circles()
+	# Initialize attack cooldown bar as hidden
+	if attack_cooldown_bar:
+		attack_cooldown_bar.visible = false
 	
 func _physics_process(delta):
 	handle_movement(delta)
@@ -156,6 +160,9 @@ func _physics_process(delta):
 	if attack_cooldown_timer > 0 and current_stance == Stance.NEUTRAL:
 		attack_cooldown_timer -= delta
 		attack_cooldown_changed.emit(attack_cooldown_timer, attack_cooldown)
+	
+	# Update attack cooldown bar visibility - only show while charging and in idle/walking states
+	update_attack_cooldown_bar_visibility()
 	
 	# Update immunity frames
 	if immunity_timer > 0:
@@ -242,6 +249,22 @@ func handle_movement(delta):
 				velocity = Vector2.ZERO
 	
 	move_and_slide()
+	
+	# Debug collision sticking
+	if get_slide_collision_count() > 0:
+		for i in get_slide_collision_count():
+			var collision = get_slide_collision(i)
+			if collision.get_collider() is Enemy:
+				var enemy = collision.get_collider()
+				var distance = global_position.distance_to(enemy.global_position)
+				# print("DEBUG: Player colliding with enemy - Player pos: ", global_position, " Enemy pos: ", enemy.global_position, " Distance: ", distance)
+				
+				# Apply separation force if too close and not dashing
+				if distance < 30.0 and not is_dashing and not enemy.is_currently_dashing():
+					var separation_direction = (global_position - enemy.global_position).normalized()
+					var separation_force = separation_direction * 50.0  # Push away gently
+					velocity += separation_force
+					# print("DEBUG: Applying separation force to player: ", separation_force)
 
 func handle_input():
 	# Don't handle input during dash or stun
@@ -288,13 +311,13 @@ func change_stance(new_stance: Stance):
 			start_parry_window()
 			# Show defense circles during combat stances
 			if defense_circles:
-				print("DEBUG: Player changing to combat stance: ", Stance.keys()[new_stance], " - showing defense circles")
+				# print("DEBUG: Player changing to combat stance: ", Stance.keys()[new_stance], " - showing defense circles")
 				defense_circles.show_defense_circles()
 		else:
 			stop_parry_window()
 			# Hide defense circles when returning to neutral
 			if defense_circles:
-				print("DEBUG: Player changing to NEUTRAL stance - hiding defense circles")
+				# print("DEBUG: Player changing to NEUTRAL stance - hiding defense circles")
 				defense_circles.hide_defense_circles()
 		
 		# Play stance change sound
@@ -842,3 +865,10 @@ func perfect_parry_success():
 	# Play perfect parry sound
 	if audio_manager and walking_audio:
 		audio_manager.play_perfect_parry_sfx(walking_audio)
+
+func update_attack_cooldown_bar_visibility():
+	# Show attack cooldown bar while charging until it's full
+	if attack_cooldown_bar:
+		var is_charging = attack_cooldown_timer > 0
+		
+		attack_cooldown_bar.visible = is_charging

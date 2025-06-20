@@ -2,10 +2,7 @@ extends Node
 class_name GameManager
 
 # References
-@onready var player_health_bar: ProgressBar = $"../UILayer/HealthUI/PlayerHealth"
 @onready var stance_indicator: Label = $"../UILayer/HealthUI/StanceIndicator"
-@onready var attack_cooldown_bar: ProgressBar = $"../UILayer/HealthUI/AttackCooldownBar"
-@onready var cooldown_label: Label = $"../UILayer/HealthUI/CooldownLabel"
 @onready var defense_point_1: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint1"
 @onready var defense_point_2: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint2"
 @onready var defense_point_3: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint3"
@@ -45,7 +42,6 @@ func _ready():
 		enemy.enemy_defense_points_changed.connect(_on_enemy_defense_points_changed)
 	
 	# Initialize UI
-	update_player_health_ui(player.current_health if player else 5)
 	update_stance_ui(player.current_stance if player else Player.Stance.ROCK)
 	update_attack_cooldown_ui(0.0, 1.0)  # Initialize cooldown bar
 	update_player_defense_points_ui(3, 3)  # Initialize defense points
@@ -53,7 +49,6 @@ func _ready():
 	initialize_hearts(player.max_health if player else 5)
 
 func _on_player_health_changed(new_health: int):
-	update_player_health_ui(new_health)
 	update_hearts_display(new_health)
 
 func _on_player_stance_changed(new_stance: Player.Stance):
@@ -88,18 +83,6 @@ func _on_enemy_defense_points_changed(current_defense: int, max_defense: int):
 	# For now just print, enemy defense points visual will be added next
 	print("Enemy defense points: ", current_defense, "/", max_defense)
 
-func update_player_health_ui(health: int):
-	if player_health_bar:
-		var health_percent = float(health) / 5.0 * 100.0
-		player_health_bar.value = health_percent
-		
-		# Change health bar color
-		if health_percent > 66:
-			player_health_bar.modulate = Color.GREEN
-		elif health_percent > 33:
-			player_health_bar.modulate = Color.YELLOW
-		else:
-			player_health_bar.modulate = Color.RED
 
 func update_stance_ui(stance: Player.Stance):
 	if stance_indicator:
@@ -123,22 +106,16 @@ func update_stance_ui(stance: Player.Stance):
 				stance_indicator.modulate = Color.YELLOW
 
 func update_attack_cooldown_ui(current_cooldown: float, max_cooldown: float):
-	if attack_cooldown_bar and cooldown_label:
+	if player and player.attack_cooldown_bar:
 		# Update progress bar (inverted - full bar means ready, empty means cooling down)
 		var progress = 1.0 - (current_cooldown / max_cooldown)
-		attack_cooldown_bar.value = progress
+		player.attack_cooldown_bar.value = progress
 		
-		# Update label and color
+		# Update color
 		if current_cooldown <= 0:
-			cooldown_label.text = "Attack Ready"
-			attack_cooldown_bar.modulate = Color.GREEN
-			# When cooldown completes and player is not in a stance, show neutral indicator
-			if player and player.current_stance != Player.Stance.NEUTRAL:
-				# Add visual indication that neutral stance is available
-				cooldown_label.text = "Attack Ready - Return to 👤 Neutral"
+			player.attack_cooldown_bar.modulate = Color.GREEN
 		else:
-			cooldown_label.text = "Cooldown: %.1fs" % current_cooldown
-			attack_cooldown_bar.modulate = Color.RED
+			player.attack_cooldown_bar.modulate = Color.RED
 
 func update_player_defense_points_ui(current_defense: int, max_defense: int):
 	# Update defense point visual indicators

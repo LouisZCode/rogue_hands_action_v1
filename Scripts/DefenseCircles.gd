@@ -12,7 +12,7 @@ var fading_circles: Array[Dictionary] = []  # Store fading circle data
 
 # Debug state tracking
 var should_be_visible: bool = false
-var debug_enabled: bool = true
+var debug_enabled: bool = false
 
 func _draw():
 	if visible:

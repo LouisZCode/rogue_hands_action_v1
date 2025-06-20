@@ -280,6 +280,22 @@ func update_ai(delta):
 	# Movement is now handled in handle_dash_movement() during dashes
 	if not is_dashing:
 		move_and_slide()
+		
+		# Debug collision sticking
+		if get_slide_collision_count() > 0:
+			for i in get_slide_collision_count():
+				var collision = get_slide_collision(i)
+				if collision.get_collider() is Player:
+					var player = collision.get_collider()
+					var distance = global_position.distance_to(player.global_position)
+					# print("DEBUG: Enemy colliding with player - Enemy pos: ", global_position, " Player pos: ", player.global_position, " Distance: ", distance)
+					
+					# Apply separation force if too close and not dashing
+					if distance < 30.0 and not is_dashing and not player.is_currently_dashing():
+						var separation_direction = (global_position - player.global_position).normalized()
+						var separation_force = separation_direction * 40.0  # Push away gently
+						velocity += separation_force
+						# print("DEBUG: Applying separation force to enemy: ", separation_force)
 
 func handle_walking_movement():
 	# Change direction periodically or if hitting boundaries
@@ -421,6 +437,14 @@ func handle_dash_movement(delta):
 			
 		# CRITICAL FIX: Apply movement during dash
 		move_and_slide()
+		
+		# Debug collision sticking during dash
+		if get_slide_collision_count() > 0:
+			for i in get_slide_collision_count():
+				var collision = get_slide_collision(i)
+				if collision.get_collider() is Player:
+					# print("DEBUG: Enemy DASH colliding with player - Enemy pos: ", global_position, " Player pos: ", collision.get_collider().global_position, " Distance: ", global_position.distance_to(collision.get_collider().global_position))
+					pass
 			
 		# Check for player hits during dash
 		attack_during_dash()
