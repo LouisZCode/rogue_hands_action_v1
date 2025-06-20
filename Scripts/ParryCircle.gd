@@ -29,3 +29,21 @@ func show_parry_circle():
 func hide_parry_circle():
 	# Hide the circle
 	visible = false
+
+func show_perfect_parry_flash():
+	# Flash bright white/gold for perfect parry feedback
+	circle_color = Color(1, 1, 0, 0.8)  # Bright gold
+	circle_radius = 60.0  # Larger radius for emphasis
+	visible = true
+	queue_redraw()
+	
+	# Create tween to fade back to normal
+	var flash_tween = create_tween()
+	flash_tween.tween_method(flash_fade_callback, 1.0, 0.0, 0.5)
+	flash_tween.tween_callback(hide_parry_circle)
+
+func flash_fade_callback(fade_ratio: float):
+	# Called during flash fade animation
+	circle_color = Color(1, 1, 0, fade_ratio * 0.8)  # Fade out gold
+	circle_radius = 60.0 - (fade_ratio * 10.0)  # Shrink slightly
+	queue_redraw()

@@ -81,6 +81,16 @@ var players_hit_this_dash: Array[Node] = []
 @onready var alert_indicator: Label = $AlertIndicator
 @onready var detection_area: Area2D = $DetectionArea
 @onready var attack_area: Area2D = $AttackArea
+@onready var audio_player: AudioStreamPlayer2D = $AudioPlayer
+
+# Audio management
+var audio_manager: AudioManager
+
+# Debug visualization
+var debug_detection_range: bool = true  # Set to false to hide
+var base_detection_radius: float = 150.0  # Normal detection range
+var enhanced_detection_radius: float = 300.0  # When player is spotted (double size)
+var current_detection_radius: float = 150.0  # Current radius for drawing
 
 # Stance colors and symbols (enemy uses all stances tactically)
 var stance_colors = {
@@ -102,12 +112,19 @@ signal enemy_attack(attacker_stance: Stance, attack_position: Vector2)
 signal enemy_defense_points_changed(current_defense: int, max_defense: int)
 
 func _ready():
+	# Initialize audio manager
+	audio_manager = AudioManager.new()
+	
 	update_visual()
 	detection_area.body_entered.connect(_on_detection_area_body_entered)
 	detection_area.body_exited.connect(_on_detection_area_body_exited)
 	attack_area.body_entered.connect(_on_attack_area_body_entered)
 	# Emit initial defense points
 	enemy_defense_points_changed.emit(current_defense_points, max_defense_points)
+	
+	# Enable debug drawing
+	if debug_detection_range:
+		queue_redraw()
 	
 	# Initialize walking behavior
 	pick_new_walking_direction()
@@ -167,12 +184,14 @@ func update_ai(delta):
 				# Hide lost indicator
 				if lost_indicator:
 					lost_indicator.visible = false
-					print("DEBUG: Hiding lost indicator - timer expired")
+					# print("DEBUG: Hiding lost indicator - timer expired")
+				# Reset detection range when giving up search
+				reset_detection_range()
 				# Return to walking
 				current_state = AIState.WALKING
 				pick_new_walking_direction()
 				walking_timer = direction_change_interval
-				print("DEBUG: Lost player timer expired, returning to walking")
+				# print("DEBUG: Lost player timer expired, returning to walking")
 		
 		AIState.ALERT:
 			# Stand still and show alert - brief pause before engaging
@@ -447,6 +466,9 @@ func attack_during_dash():
 				if player_ref.has_method("consume_defense_point"):
 					if player_ref.consume_defense_point():
 						print("Player blocked with defense point!")
+						# Play regular block sound (successful block outside parry window)
+						if player_ref.audio_manager and player_ref.walking_audio:
+							player_ref.audio_manager.play_regular_block_sfx(player_ref.walking_audio)
 					else:
 						# No defense points left, take damage instead
 						combat_result.damage = 2
@@ -518,9 +540,21 @@ func calculate_combat_damage(enemy_stance: Stance, player_stance, is_mutual_atta
 		# Enemy wins
 		result.damage = 2
 	else:
-		# Enemy loses (parry) - enemy gets stunned
+		# Enemy loses - check if player is in parry window for perfect parry
 		result.damage = 0
-		result.enemy_stunned = true
+		# Check if player has parry window active for perfect parry
+		var player_ref = get_tree().get_first_node_in_group("player")
+		if player_ref and player_ref.has_method("is_in_parry_window") and player_ref.is_in_parry_window():
+			# Perfect parry! Stun enemy
+			result.enemy_stunned = true
+			# Trigger perfect parry feedback on player
+			if player_ref.has_method("perfect_parry_success"):
+				player_ref.perfect_parry_success()
+			print("Perfect parry! Enemy stunned!")
+		else:
+			# Regular successful block - consume defense point instead
+			result.player_defense_consumed = true
+			print("Successful block outside parry window - defense point consumed")
 	
 	return result
 
@@ -624,6 +658,10 @@ func take_damage(amount: int):
 		
 	current_health = max(0, current_health - amount)
 	update_health_bar()
+	
+	# Play hit sound
+	if audio_manager and audio_player:
+		audio_manager.play_enemy_hit_sfx(audio_player)
 	
 	# Spawn blue damage number (player dealing damage to enemy)
 	spawn_damage_number(amount)
@@ -762,6 +800,10 @@ func apply_stun():
 	# Hide all other indicators when stunned
 	hide_all_indicators()
 	
+	# Play stun sound
+	if audio_manager and audio_player:
+		audio_manager.play_enemy_stun_sfx(audio_player)
+	
 	# Visual feedback for stun
 	var tween = create_tween()
 	tween.tween_property(sprite, "modulate", Color.PURPLE, 0.2)
@@ -772,8 +814,16 @@ func apply_stun():
 
 func die():
 	print("Enemy died!")
+	# Play death sound and delay destruction to allow sound to play
+	if audio_manager and audio_player:
+		audio_manager.play_enemy_death_sfx(audio_player)
+	
 	enemy_died.emit()
-	queue_free()
+	
+	# Add a small delay before destroying the node to allow death sound to play
+	var death_timer = create_tween()
+	death_timer.tween_interval(0.5)  # Wait 0.5 seconds
+	death_timer.tween_callback(queue_free)
 
 func hide_all_indicators():
 	if alert_indicator:
@@ -781,6 +831,35 @@ func hide_all_indicators():
 	if lost_indicator:
 		lost_indicator.visible = false
 	# Don't hide stun indicator - it should only be controlled by stun system
+
+func _draw():
+	# Draw debug detection circle
+	if debug_detection_range:
+		# Change color based on detection state - orange when enhanced
+		var circle_color = Color(1, 0, 0, 0.1) if current_detection_radius == base_detection_radius else Color(1, 0.5, 0, 0.15)
+		var outline_color = Color(1, 0, 0, 0.3) if current_detection_radius == base_detection_radius else Color(1, 0.5, 0, 0.5)
+		
+		draw_circle(Vector2.ZERO, current_detection_radius, circle_color)  
+		draw_arc(Vector2.ZERO, current_detection_radius, 0, TAU, 64, outline_color, 3.0)
+
+func enhance_detection_range():
+	# Double the detection range when player is spotted
+	current_detection_radius = enhanced_detection_radius
+	# Scale up the actual collision area (base is 25px * 12x = 300px radius)
+	var detection_collision = detection_area.get_child(0) as CollisionShape2D
+	if detection_collision:
+		detection_collision.scale = Vector2(12, 12)  # 25px base * 12x = 300px radius
+	queue_redraw()
+	print("Enemy enhanced detection - harder to escape!")
+
+func reset_detection_range():
+	# Return to normal detection range
+	current_detection_radius = base_detection_radius
+	# Scale back the collision area (base is 25px * 6x = 150px radius)
+	var detection_collision = detection_area.get_child(0) as CollisionShape2D
+	if detection_collision:
+		detection_collision.scale = Vector2(6, 6)  # 25px base * 6x = 150px radius
+	queue_redraw()
 
 func _on_detection_area_body_entered(body):
 	if body is Player:
@@ -802,11 +881,18 @@ func _on_detection_area_body_entered(body):
 			alert_timer = alert_duration
 			if alert_indicator:
 				alert_indicator.visible = true
+			# Enhance detection range when player is spotted
+			enhance_detection_range()
+			# Play alert sound
+			if audio_manager and audio_player:
+				audio_manager.play_enemy_alert_sfx(audio_player)
 			print("Enemy spotted player - ALERT!")
 		else:
 			# Was already in some other state, go directly to observing
 			current_state = AIState.OBSERVING
 			positioning_timer = randf_range(0.5, 1.0)
+			# Enhance detection range when player is spotted
+			enhance_detection_range()
 			print("Enemy detected player - entering tactical mode")
 
 func _on_detection_area_body_exited(body):
@@ -814,6 +900,9 @@ func _on_detection_area_body_exited(body):
 		# Don't interrupt if enemy is in attacking state (committed to attack)
 		if current_state != AIState.ATTACKING:
 			player_ref = null
+			
+			# Reset detection range when player escapes
+			reset_detection_range()
 			
 			# Check if we were in combat states (not just walking around)
 			var was_in_combat = current_state in [AIState.ALERT, AIState.OBSERVING, AIState.POSITIONING, AIState.STANCE_SELECTION, AIState.RETREATING]
@@ -824,6 +913,9 @@ func _on_detection_area_body_exited(body):
 				lost_player_timer = lost_player_duration
 				if lost_indicator:
 					lost_indicator.visible = true
+				# Play lost player sound
+				if audio_manager and audio_player:
+					audio_manager.play_enemy_lost_player_sfx(audio_player)
 				print("DEBUG: Enemy confused - lost player during combat, timer set to: ", lost_player_timer)
 			else:
 				# Was just walking, return to walking immediately

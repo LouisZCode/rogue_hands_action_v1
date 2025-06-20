@@ -63,7 +63,7 @@ var base_position: Vector2
 var breathing_timer: float = 0.0
 var breathing_speed: float = 1.0  # Slower than bobbing for realistic breathing
 var breathing_scale_amplitude: float = 0.03  # 3% scale variation
-var base_scale: Vector2 = Vector2(0.75, 0.75)
+var base_scale: Vector2 = Vector2(1.0, 1.0)
 
 # Directional rotation
 var current_rotation: float = 0.0
@@ -116,6 +116,9 @@ signal attack_cooldown_changed(current_cooldown: float, max_cooldown: float)
 signal defense_points_changed(current_defense: int, max_defense: int)
 
 func _ready():
+	# Add to player group for easy access by enemies
+	add_to_group("player")
+	
 	update_stance_visual()
 	attack_area.body_entered.connect(_on_attack_area_body_entered)
 	# Emit initial defense points
@@ -276,6 +279,10 @@ func change_stance(new_stance: Stance):
 			start_parry_window()
 		else:
 			stop_parry_window()
+		
+		# Play stance change sound
+		if audio_manager and walking_audio:
+			audio_manager.play_stance_change_sfx(walking_audio)
 		
 		update_stance_visual()
 		stance_changed.emit(current_stance)
@@ -525,7 +532,7 @@ func update_animation_state(delta):
 		"idle":
 			# Only modify base_scale if not dashing (prevents corruption)
 			if not is_dashing:
-				base_scale = Vector2(0.75, 0.75)
+				base_scale = Vector2(1.0, 1.0)
 			
 			# Vertical bobbing
 			idle_bobbing_timer += delta * idle_bobbing_speed
@@ -542,7 +549,7 @@ func update_animation_state(delta):
 		"walking":
 			# Only modify base_scale if not dashing (prevents corruption)
 			if not is_dashing:
-				base_scale = Vector2(0.75, 0.75)
+				base_scale = Vector2(1.0, 1.0)
 			sprite.position = base_position
 			# Only set scale if not dashing (preserve scale during dash)
 			if not is_dashing:
@@ -551,7 +558,7 @@ func update_animation_state(delta):
 		"rock", "paper", "scissors":
 			# Only modify base_scale if not dashing (prevents corruption)
 			if not is_dashing:
-				base_scale = Vector2(0.12, 0.12)
+				base_scale = Vector2(0.16, 0.16)
 			sprite.position = base_position
 			# Only set scale if not dashing (preserve scale during dash)
 			if not is_dashing:
@@ -604,6 +611,10 @@ func perform_dash_attack(direction: Vector2):
 	dash_direction = direction
 	dash_timer = dash_duration
 	
+	# Play attack sound
+	if audio_manager and walking_audio:
+		audio_manager.play_player_attack_sfx(walking_audio)
+	
 	# Start attack cooldown
 	attack_cooldown_timer = attack_cooldown
 	
@@ -651,6 +662,10 @@ func take_damage(amount: int):
 	current_health = max(0, current_health - final_damage)
 	health_changed.emit(current_health)
 	
+	# Play hit sound
+	if audio_manager and walking_audio:
+		audio_manager.play_player_hit_sfx(walking_audio)
+	
 	# Enhanced damage feedback system
 	show_damage_feedback(final_damage, original_damage)
 	
@@ -691,6 +706,9 @@ func consume_defense_point() -> bool:
 	if current_defense_points > 0:
 		current_defense_points -= 1
 		defense_points_changed.emit(current_defense_points, max_defense_points)
+		# Play defense point consumed sound
+		if audio_manager and walking_audio:
+			audio_manager.play_defense_point_consumed_sfx(walking_audio)
 		return true
 	return false
 
@@ -717,8 +735,12 @@ func apply_stun():
 	change_stance(Stance.NEUTRAL)
 	
 	# Ensure proper neutral scale during stun (fixes tiny sprite bug)
-	sprite.scale = Vector2(0.75, 0.75)
+	sprite.scale = Vector2(1.0, 1.0)
 	current_animation_state = "idle"
+	
+	# Play stun sound
+	if audio_manager and walking_audio:
+		audio_manager.play_player_stun_sfx(walking_audio)
 	
 	# Visual feedback for stun
 	var tween = create_tween()
@@ -730,6 +752,9 @@ func apply_stun():
 
 func die():
 	print("Player died!")
+	# Play death sound
+	if audio_manager and walking_audio:
+		audio_manager.play_player_death_sfx(walking_audio)
 	# Handle player death (restart game, etc.)
 	get_tree().reload_current_scene()
 
@@ -785,3 +810,15 @@ func update_parry_window(delta):
 func is_in_parry_window() -> bool:
 	# Check if player is currently in the parry window
 	return is_parry_window_active and parry_window_timer > 0
+
+func perfect_parry_success():
+	# Called when a perfect parry is executed
+	print("PERFECT PARRY!")
+	# Add visual feedback - flash the parry circle bright
+	if parry_circle:
+		parry_circle.show_perfect_parry_flash()
+	# Add screen shake for feedback
+	start_screen_shake(12.0, 0.3)
+	# Play perfect parry sound
+	if audio_manager and walking_audio:
+		audio_manager.play_perfect_parry_sfx(walking_audio)

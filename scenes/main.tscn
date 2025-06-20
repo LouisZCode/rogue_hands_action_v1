@@ -17,7 +17,8 @@ size = Vector2(50, 50)
 [node name="Main" type="Node2D"]
 
 [node name="RoomTest2" type="Sprite2D" parent="."]
-position = Vector2(-1, 5)
+position = Vector2(0.999968, 0.999985)
+scale = Vector2(1.4725, 1.55667)
 texture = ExtResource("1_jyhfs")
 
 [node name="Background" type="ColorRect" parent="."]
@@ -34,54 +35,6 @@ color = Color(0.2, 0.3, 0.5, 1)
 position = Vector2(200, 200)
 
 [node name="LevelBounds" type="StaticBody2D" parent="GameLayer"]
-
-[node name="TopWallSprite" type="ColorRect" parent="GameLayer/LevelBounds"]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -400.0
-offset_top = -335.0
-offset_right = 400.0
-offset_bottom = -315.0
-color = Color(0.4, 0.4, 0.4, 1)
-
-[node name="BottomWallSprite" type="ColorRect" parent="GameLayer/LevelBounds"]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -400.0
-offset_top = 315.0
-offset_right = 400.0
-offset_bottom = 335.0
-color = Color(0.4, 0.4, 0.4, 1)
-
-[node name="LeftWallSprite" type="ColorRect" parent="GameLayer/LevelBounds"]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -435.0
-offset_top = -300.0
-offset_right = -415.0
-offset_bottom = 300.0
-color = Color(0.4, 0.4, 0.4, 1)
-
-[node name="RightWallSprite" type="ColorRect" parent="GameLayer/LevelBounds"]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = 415.0
-offset_top = -300.0
-offset_right = 435.0
-offset_bottom = 300.0
-color = Color(0.4, 0.4, 0.4, 1)
 
 [node name="TopWall" type="CollisionShape2D" parent="GameLayer/LevelBounds"]
 position = Vector2(0, -325)

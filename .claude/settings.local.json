@@ -10,7 +10,8 @@
       "Bash(mv:*)",
       "Bash(rg:*)",
       "WebFetch(domain:forum.godotengine.org)",
-      "Bash(afplay:*)"
+      "Bash(afplay:*)",
+      "Bash(powershell.exe:*)"
     ],
     "deny": []
   }
