@@ -1014,16 +1014,20 @@ func _on_detection_area_body_exited(body):
 func update_enemy_dash_preview():
 	# Show simple trajectory line from enemy position to target when attacking
 	if not dash_preview:
+		print("DEBUG: Enemy dash_preview node not found!")
 		return
 		
 	# Show trajectory only in ATTACKING state with a stance selected
 	if current_state == AIState.ATTACKING and current_stance != Stance.NEUTRAL and player_ref:
-		# Calculate relative position from enemy to target
-		var relative_target = target_attack_position - global_position
+		print("DEBUG: Enemy showing dash line - state: ", AIState.keys()[current_state], " stance: ", Stance.keys()[current_stance])
+		# Calculate direction to target and apply consistent dash distance
+		var direction_to_target = (target_attack_position - global_position).normalized()
+		var enemy_dash_distance = dash_speed * dash_duration  # 300 * 0.6 = 180 pixels
+		var relative_target = direction_to_target * enemy_dash_distance
 		dash_preview.show_simple_dash_line(relative_target)
 		# Debug: Show exact positions
 		if stance_to_dash_timer > stance_to_dash_delay * 0.8:  # Only print early in attack phase
-			print("ENEMY: Dash line relative vector: ", relative_target, " (from ", global_position, " to ", target_attack_position, ")")
+			print("ENEMY: Dash line relative vector: ", relative_target, " (consistent distance: ", enemy_dash_distance, "px)")
 	else:
 		# Hide trajectory if not in attacking state
 		dash_preview.hide_dash_trajectory()

@@ -4,12 +4,9 @@ class_name DashPreview
 # Dash trajectory visualization for both player and enemy
 @export var dash_line_color: Color = Color.BLUE
 @export var dash_line_width: float = 40.0
-@export var dash_line_alpha: float = 0.5
+@export var dash_line_alpha: float = 0.9
 
-# Configuration
-var dash_speed: float = 600.0
-var dash_duration: float = 0.6
-var max_dash_distance: float = 360.0  # dash_speed * dash_duration
+# Configuration - now dynamic, no hardcoded values
 
 func _ready():
 	# Configure line appearance
@@ -17,8 +14,8 @@ func _ready():
 	width = dash_line_width
 	default_color.a = dash_line_alpha
 	
-	# Ensure line renders above sprites
-	z_index = 10
+	# Ensure line renders above background but below sprites
+	z_index = 1
 	
 	# Hide by default
 	visible = false
@@ -26,10 +23,13 @@ func _ready():
 func show_simple_dash_line(relative_end: Vector2):
 	# Simple line from character center (0,0) to relative end position
 	# Since Line2D is child of character, (0,0) is character center
+	print("DEBUG: DashPreview.show_simple_dash_line called with: ", relative_end)
+	print("DEBUG: DashPreview z_index: ", z_index, " visible: ", visible, " alpha: ", default_color.a)
 	clear_points()
 	add_point(Vector2.ZERO)  # Start at character center
 	add_point(relative_end)  # End at relative position from character
 	visible = true
+	print("DEBUG: DashPreview after setup - visible: ", visible, " point count: ", get_point_count())
 
 # Legacy function for backward compatibility
 func show_dash_trajectory(start_pos: Vector2, direction: Vector2, speed: float, duration: float):
@@ -59,7 +59,7 @@ func set_enemy_style():
 	set_line_color(Color.RED)
 
 func set_player_style():
-	# Blue line for player trajectories  
-	set_line_color(Color.CYAN)
+	# Bright yellow-green line for player trajectories  
+	set_line_color(Color.YELLOW)
 
 # Simplified - use direct character positions

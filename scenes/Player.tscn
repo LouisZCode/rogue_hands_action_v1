@@ -201,7 +201,6 @@ max_value = 1.0
 show_percentage = false
 
 [node name="DashPreview" type="Line2D" parent="."]
-z_index = 10
 script = ExtResource("9_dash_preview_script")
 
 [node name="Camera2D" type="Camera2D" parent="."]

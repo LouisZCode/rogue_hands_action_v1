@@ -4,7 +4,7 @@ class_name Player
 # Movement variables
 @export var speed: float = 200.0
 @export var dash_speed: float = 600.0
-@export var dash_duration: float = 0.6  # Doubled for increased dash distance
+@export var dash_duration: float = 0.3  # Half of enemy dash distance
 
 # Movement interpolation
 @export var acceleration: float = 800.0  # Units per second squared (4x speed for responsive feel)
@@ -910,10 +910,12 @@ func perfect_parry_success():
 func update_dash_preview():
 	# Show simple dash line when in combat stance and ready to attack
 	if not dash_preview:
+		print("DEBUG: dash_preview node not found!")
 		return
 		
 	# Only show dash preview if in combat stance, not stunned, not dashing, and cooldown ready
 	if current_stance != Stance.NEUTRAL and not is_stunned and not is_dashing and attack_cooldown_timer <= 0:
+		print("DEBUG: Player showing dash line - stance: ", Stance.keys()[current_stance], " cooldown: ", attack_cooldown_timer)
 		# Check if holding direction keys to determine if player wants to attack
 		var input_direction = Vector2.ZERO
 		if Input.is_action_pressed("move_up"):
@@ -933,9 +935,10 @@ func update_dash_preview():
 			# Show aim line in the direction player is currently facing (entering_stance_direction)
 			aim_direction = Vector2.from_angle(deg_to_rad(entering_stance_direction))
 		
-		# Calculate relative end position and show simple line
-		var dash_distance = dash_speed * dash_duration  # 600 * 0.6 = 360 pixels
+		# Calculate relative end position using actual player stats
+		var dash_distance = dash_speed * dash_duration  # 600 * 0.3 = 180 pixels
 		var relative_end = aim_direction.normalized() * dash_distance
+		print("DEBUG: Player calling show_simple_dash_line with relative_end: ", relative_end)
 		dash_preview.show_simple_dash_line(relative_end)
 	else:
 		# Hide trajectory if not in combat stance or conditions not met
