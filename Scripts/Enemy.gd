@@ -355,7 +355,7 @@ func is_near_boundary() -> bool:
 func is_position_near_boundary(pos: Vector2) -> bool:
 	# Check if position is near arena boundaries (with some margin)
 	var margin = 50.0
-	return pos.x < -425 + margin or pos.x > 425 - margin or pos.y < -325 + margin or pos.y > 325 - margin
+	return pos.x < -425 + margin or pos.x > 425 - margin or pos.y < -275 + margin or pos.y > 275 - margin
 
 # New AI methods for tactical combat
 func observe_player():
@@ -1014,12 +1014,10 @@ func _on_detection_area_body_exited(body):
 func update_enemy_dash_preview():
 	# Show simple trajectory line from enemy position to target when attacking
 	if not dash_preview:
-		print("DEBUG: Enemy dash_preview node not found!")
 		return
 		
 	# Show trajectory only in ATTACKING state with a stance selected
 	if current_state == AIState.ATTACKING and current_stance != Stance.NEUTRAL and player_ref:
-		print("DEBUG: Enemy showing dash line - state: ", AIState.keys()[current_state], " stance: ", Stance.keys()[current_stance])
 		# Calculate direction to target and apply consistent dash distance
 		var direction_to_target = (target_attack_position - global_position).normalized()
 		var enemy_dash_distance = dash_speed * dash_duration  # 300 * 0.6 = 180 pixels

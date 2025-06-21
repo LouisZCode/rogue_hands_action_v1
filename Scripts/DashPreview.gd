@@ -2,6 +2,14 @@ extends Line2D
 class_name DashPreview
 
 # Dash trajectory visualization for both player and enemy
+#
+# Z-INDEX ARCHITECTURE FOR PROJECT:
+# 10+ : UI elements, floating text, damage numbers
+# 5-9 : Above-character effects (floating particles, status icons)
+# 2-4 : Character sprites and important game objects
+# 0-1 : Below-character gameplay elements (lines, circles, decals, auras)
+# -5-(-1): Background decorative elements
+# -10-(-6): Base background, terrain
 @export var dash_line_color: Color = Color.BLUE
 @export var dash_line_width: float = 40.0
 @export var dash_line_alpha: float = 0.5
@@ -14,8 +22,8 @@ func _ready():
 	width = dash_line_width
 	default_color.a = dash_line_alpha
 	
-	# Ensure line renders above background but below sprites
-	z_index = 1
+	# Z-Index Architecture: Below character sprites (z=2) but above background (z<0)
+	z_index = 0
 	
 	# Hide by default
 	visible = false
@@ -23,13 +31,10 @@ func _ready():
 func show_simple_dash_line(relative_end: Vector2):
 	# Simple line from character center (0,0) to relative end position
 	# Since Line2D is child of character, (0,0) is character center
-	print("DEBUG: DashPreview.show_simple_dash_line called with: ", relative_end)
-	print("DEBUG: DashPreview z_index: ", z_index, " visible: ", visible, " alpha: ", default_color.a)
 	clear_points()
 	add_point(Vector2.ZERO)  # Start at character center
 	add_point(relative_end)  # End at relative position from character
 	visible = true
-	print("DEBUG: DashPreview after setup - visible: ", visible, " point count: ", get_point_count())
 
 # Legacy function for backward compatibility
 func show_dash_trajectory(start_pos: Vector2, direction: Vector2, speed: float, duration: float):
@@ -43,7 +48,7 @@ func hide_dash_trajectory():
 
 func clamp_to_level_bounds(pos: Vector2) -> Vector2:
 	# Basic level boundary clamping (adjust based on your level size)
-	var level_bounds = Rect2(-400, -300, 800, 600)  # Approximate main scene bounds
+	var level_bounds = Rect2(-400, -250, 800, 500)  # Updated scene bounds
 	return Vector2(
 		clamp(pos.x, level_bounds.position.x + 25, level_bounds.position.x + level_bounds.size.x - 25),
 		clamp(pos.y, level_bounds.position.y + 25, level_bounds.position.y + level_bounds.size.y - 25)

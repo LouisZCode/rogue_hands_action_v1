@@ -9,13 +9,13 @@
 size = Vector2(800, 20)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
-size = Vector2(20, 600)
+size = Vector2(20, 500)
 
 [node name="Main" type="Node2D"]
 
 [node name="RoomTest2" type="Sprite2D" parent="."]
-position = Vector2(-1.00003, 0.99998)
-scale = Vector2(1.4725, 1.55667)
+position = Vector2(-1.00003, -7.50002)
+scale = Vector2(1.4725, 1.355)
 texture = ExtResource("1_jyhfs")
 
 [node name="Background" type="ColorRect" parent="."]
@@ -36,11 +36,11 @@ position = Vector2(200, 200)
 [node name="LevelBounds" type="StaticBody2D" parent="GameLayer"]
 
 [node name="TopWall" type="CollisionShape2D" parent="GameLayer/LevelBounds"]
-position = Vector2(0, -325)
+position = Vector2(0, -275)
 shape = SubResource("RectangleShape2D_2")
 
 [node name="BottomWall" type="CollisionShape2D" parent="GameLayer/LevelBounds"]
-position = Vector2(0, 325)
+position = Vector2(0, 275)
 shape = SubResource("RectangleShape2D_2")
 
 [node name="LeftWall" type="CollisionShape2D" parent="GameLayer/LevelBounds"]

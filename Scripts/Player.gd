@@ -910,12 +910,10 @@ func perfect_parry_success():
 func update_dash_preview():
 	# Show simple dash line when in combat stance and ready to attack
 	if not dash_preview:
-		print("DEBUG: dash_preview node not found!")
 		return
 		
 	# Only show dash preview if in combat stance, not stunned, not dashing, and cooldown ready
 	if current_stance != Stance.NEUTRAL and not is_stunned and not is_dashing and attack_cooldown_timer <= 0:
-		print("DEBUG: Player showing dash line - stance: ", Stance.keys()[current_stance], " cooldown: ", attack_cooldown_timer)
 		# Check if holding direction keys to determine if player wants to attack
 		var input_direction = Vector2.ZERO
 		if Input.is_action_pressed("move_up"):
@@ -927,19 +925,15 @@ func update_dash_preview():
 		if Input.is_action_pressed("move_right"):
 			input_direction += Vector2.RIGHT
 		
-		var aim_direction: Vector2
+		# Only show line when actively pressing direction keys
 		if input_direction.length() > 0:
-			# Use the input direction for aim line (player is actively aiming)
-			aim_direction = input_direction
+			# Calculate relative end position using actual player stats
+			var dash_distance = dash_speed * dash_duration  # 600 * 0.3 = 180 pixels
+			var relative_end = input_direction.normalized() * dash_distance
+			dash_preview.show_simple_dash_line(relative_end)
 		else:
-			# Show aim line in the direction player is currently facing (entering_stance_direction)
-			aim_direction = Vector2.from_angle(deg_to_rad(entering_stance_direction))
-		
-		# Calculate relative end position using actual player stats
-		var dash_distance = dash_speed * dash_duration  # 600 * 0.3 = 180 pixels
-		var relative_end = aim_direction.normalized() * dash_distance
-		print("DEBUG: Player calling show_simple_dash_line with relative_end: ", relative_end)
-		dash_preview.show_simple_dash_line(relative_end)
+			# Hide line when no direction is being pressed
+			dash_preview.hide_dash_trajectory()
 	else:
 		# Hide trajectory if not in combat stance or conditions not met
 		dash_preview.hide_dash_trajectory()
