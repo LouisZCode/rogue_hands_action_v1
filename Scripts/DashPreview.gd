@@ -4,7 +4,7 @@ class_name DashPreview
 # Dash trajectory visualization for both player and enemy
 @export var dash_line_color: Color = Color.BLUE
 @export var dash_line_width: float = 40.0
-@export var dash_line_alpha: float = 0.9
+@export var dash_line_alpha: float = 0.5
 
 # Configuration - now dynamic, no hardcoded values
 
@@ -59,7 +59,7 @@ func set_enemy_style():
 	set_line_color(Color.RED)
 
 func set_player_style():
-	# Bright yellow-green line for player trajectories  
-	set_line_color(Color.YELLOW)
+	# Blue line for player trajectories  
+	set_line_color(Color.ROYAL_BLUE)
 
 # Simplified - use direct character positions
