@@ -4,9 +4,9 @@ class_name Enemy
 # AI and movement variables
 @export var speed: float = 100.0
 @export var detection_range: float = 150.0
-@export var attack_range: float = 50.0
+@export var attack_range: float = 100.0  # Doubled for increased tactical space
 @export var dash_speed: float = 300.0  # Half of player dash speed
-@export var dash_duration: float = 0.3
+@export var dash_duration: float = 0.6  # Doubled for increased dash distance
 
 # Debug/Testing variables
 @export var debug_rock_only: bool = true  # For combat testing - enemy only uses Rock
@@ -40,7 +40,7 @@ var retreat_timer: float = 0.0
 var last_player_stance: Player.Stance = Player.Stance.NEUTRAL
 var stance_change_cooldown: float = 0.5
 var stance_change_timer: float = 0.0
-var stance_to_dash_delay: float = 2.0  # 2 second delay after stance change
+var stance_to_dash_delay: float = 1.0  # 1 second delay after stance change (reduced for testing)
 var stance_to_dash_timer: float = 0.0
 var target_attack_position: Vector2  # Store player position when stance is selected
 
@@ -86,6 +86,7 @@ var players_hit_this_dash: Array[Node] = []
 @onready var attack_area: Area2D = $AttackArea
 @onready var audio_player: AudioStreamPlayer2D = $AudioPlayer
 @onready var attack_timer_bar: ProgressBar = $AttackTimerBar
+@onready var dash_preview: DashPreview = $DashPreview
 
 # Audio management
 var audio_manager: AudioManager
@@ -118,6 +119,10 @@ signal enemy_defense_points_changed(current_defense: int, max_defense: int)
 func _ready():
 	# Initialize audio manager
 	audio_manager = AudioManager.new()
+	
+	# Initialize dash preview for enemy
+	if dash_preview:
+		dash_preview.set_enemy_style()
 	
 	update_visual()
 	detection_area.body_entered.connect(_on_detection_area_body_entered)
@@ -244,6 +249,8 @@ func update_ai(delta):
 				current_state = AIState.ATTACKING
 			
 		AIState.ATTACKING:
+			# Show dash trajectory to target position
+			update_enemy_dash_preview()
 			# Once in attacking state, commit to the attack regardless of player position
 			if current_stance != Stance.NEUTRAL:
 				# Only attack after 2-second delay and cooldown is ready
@@ -255,8 +262,14 @@ func update_ai(delta):
 				# Hide attack timer when exiting attacking state
 				if attack_timer_bar:
 					attack_timer_bar.visible = false
+				# Hide dash preview when exiting attacking state
+				if dash_preview:
+					dash_preview.hide_dash_trajectory()
 				
 		AIState.RETREATING:
+			# Hide dash preview when retreating
+			if dash_preview:
+				dash_preview.hide_dash_trajectory()
 			# Move away and return to neutral
 			if player_ref:
 				retreat_from_player()
@@ -381,12 +394,14 @@ func select_tactical_stance():
 		# Store the player's position at the moment of stance selection
 		target_attack_position = player_ref.global_position
 		
+		print("ENEMY: Stance selection - Enemy position: ", global_position, " - Target position: ", target_attack_position)
+		
 		# Debug mode: Always use Rock for testing
 		if debug_rock_only:
 			current_stance = Stance.ROCK
 			update_visual()
-			print("Enemy selected ROCK (debug mode) vs player's ", Player.Stance.keys()[player_stance])
-			print("Target locked at position: ", target_attack_position)
+			print("ENEMY: Selected ROCK (debug mode) vs player's ", Player.Stance.keys()[player_stance])
+			print("ENEMY: Attack trajectory from ", global_position, " to ", target_attack_position)
 			return
 		
 		# Strategic stance selection based on rock-paper-scissors (disabled in debug mode)
@@ -995,6 +1010,23 @@ func _on_detection_area_body_exited(body):
 			
 			current_stance = Stance.NEUTRAL
 			update_visual()
+
+func update_enemy_dash_preview():
+	# Show simple trajectory line from enemy position to target when attacking
+	if not dash_preview:
+		return
+		
+	# Show trajectory only in ATTACKING state with a stance selected
+	if current_state == AIState.ATTACKING and current_stance != Stance.NEUTRAL and player_ref:
+		# Calculate relative position from enemy to target
+		var relative_target = target_attack_position - global_position
+		dash_preview.show_simple_dash_line(relative_target)
+		# Debug: Show exact positions
+		if stance_to_dash_timer > stance_to_dash_delay * 0.8:  # Only print early in attack phase
+			print("ENEMY: Dash line relative vector: ", relative_target, " (from ", global_position, " to ", target_attack_position, ")")
+	else:
+		# Hide trajectory if not in attacking state
+		dash_preview.hide_dash_trajectory()
 
 func add_immunity_visual_feedback():
 	# Create flickering effect during immunity frames

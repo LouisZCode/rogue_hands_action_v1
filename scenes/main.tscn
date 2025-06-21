@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://cmtfliwxho6h3"]
+[gd_scene load_steps=7 format=3 uid="uid://cmtfliwxho6h3"]
 
 [ext_resource type="Texture2D" uid="uid://2gce4meq0oy6" path="res://assets/test_sprites/room_test.webp" id="1_jyhfs"]
 [ext_resource type="PackedScene" uid="uid://bphmcqkdqkh7k" path="res://scenes/Player.tscn" id="1_player"]
@@ -10,9 +10,6 @@ size = Vector2(800, 20)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(20, 600)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_3"]
-size = Vector2(50, 50)
 
 [node name="Main" type="Node2D"]
 
@@ -28,6 +25,8 @@ anchor_bottom = 1.0
 color = Color(0.2, 0.3, 0.5, 1)
 
 [node name="GameLayer" type="Node2D" parent="."]
+
+[node name="Camera2D" type="Camera2D" parent="GameLayer"]
 
 [node name="Player" parent="GameLayer" instance=ExtResource("1_player")]
 
@@ -53,59 +52,6 @@ position = Vector2(425, 0)
 shape = SubResource("RectangleShape2D_1")
 
 [node name="Obstacles" type="Node2D" parent="GameLayer"]
-
-[node name="Obstacle1" type="StaticBody2D" parent="GameLayer/Obstacles"]
-position = Vector2(-150, -100)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="GameLayer/Obstacles/Obstacle1"]
-shape = SubResource("RectangleShape2D_3")
-
-[node name="Sprite2D" type="ColorRect" parent="GameLayer/Obstacles/Obstacle1"]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -25.0
-offset_top = -25.0
-offset_right = 25.0
-offset_bottom = 25.0
-color = Color(0.6, 0.4, 0.2, 1)
-
-[node name="Obstacle2" type="StaticBody2D" parent="GameLayer/Obstacles"]
-position = Vector2(150, 100)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="GameLayer/Obstacles/Obstacle2"]
-shape = SubResource("RectangleShape2D_3")
-
-[node name="Sprite2D" type="ColorRect" parent="GameLayer/Obstacles/Obstacle2"]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -25.0
-offset_top = -25.0
-offset_right = 25.0
-offset_bottom = 25.0
-color = Color(0.6, 0.4, 0.2, 1)
-
-[node name="Obstacle3" type="StaticBody2D" parent="GameLayer/Obstacles"]
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="GameLayer/Obstacles/Obstacle3"]
-shape = SubResource("RectangleShape2D_3")
-
-[node name="Sprite2D" type="ColorRect" parent="GameLayer/Obstacles/Obstacle3"]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -25.0
-offset_top = -25.0
-offset_right = 25.0
-offset_bottom = 25.0
-color = Color(0.6, 0.4, 0.2, 1)
 
 [node name="UILayer" type="CanvasLayer" parent="."]
 

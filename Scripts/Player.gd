@@ -4,7 +4,7 @@ class_name Player
 # Movement variables
 @export var speed: float = 200.0
 @export var dash_speed: float = 600.0
-@export var dash_duration: float = 0.3
+@export var dash_duration: float = 0.6  # Doubled for increased dash distance
 
 # Movement interpolation
 @export var acceleration: float = 800.0  # Units per second squared (4x speed for responsive feel)
@@ -84,6 +84,7 @@ var previous_stance: Stance = Stance.NEUTRAL  # Track stance changes
 @onready var parry_circle: ParryCircle = $ParryCircle
 @onready var defense_circles: DefenseCircles = $DefenseCircles
 @onready var attack_cooldown_bar: ProgressBar = $AttackCooldownBar
+@onready var dash_preview: DashPreview = $DashPreview
 
 # Audio management
 var audio_manager: AudioManager
@@ -94,7 +95,7 @@ var shake_duration: float = 0.0
 var shake_intensity: float = 0.0
 var shake_timer: float = 0.0
 var base_camera_position: Vector2
-@onready var camera: Camera2D = $Camera2D
+var scene_camera: Camera2D = null
 
 # Stance colors and symbols
 var stance_colors = {
@@ -121,6 +122,16 @@ func _ready():
 	# Add to player group for easy access by enemies
 	add_to_group("player")
 	
+	# Find the scene camera
+	scene_camera = get_tree().get_first_node_in_group("scene_camera")
+	if not scene_camera:
+		# Fallback: search for Camera2D in scene root
+		var scene_root = get_tree().current_scene
+		scene_camera = scene_root.find_child("Camera2D", true, false)
+	
+	if scene_camera:
+		base_camera_position = scene_camera.position
+	
 	update_stance_visual()
 	attack_area.body_entered.connect(_on_attack_area_body_entered)
 	# Emit initial defense points
@@ -132,8 +143,9 @@ func _ready():
 	rotation_tween.kill()  # Stop it initially
 	# Initialize audio manager
 	audio_manager = AudioManager.new()
-	# Initialize camera shake system
-	base_camera_position = camera.position
+	# Initialize dash preview
+	if dash_preview:
+		dash_preview.set_player_style()
 	# Initialize parry circle as hidden
 	if parry_circle:
 		parry_circle.hide_parry_circle()
@@ -148,6 +160,7 @@ func _ready():
 func _physics_process(delta):
 	handle_movement(delta)
 	handle_input()
+	update_dash_preview()
 	update_animation_state(delta)
 	update_screen_shake(delta)
 	update_parry_window(delta)
@@ -358,11 +371,13 @@ func update_screen_shake(delta: float):
 			randf_range(-shake_strength, shake_strength)
 		)
 		
-		# Apply shake to camera
-		camera.position = base_camera_position + shake_offset
+		# Apply shake to scene camera
+		if scene_camera:
+			scene_camera.position = base_camera_position + shake_offset
 	else:
 		# Return camera to base position when shake ends
-		camera.position = base_camera_position
+		if scene_camera:
+			scene_camera.position = base_camera_position
 
 enum DamageCategory { NONE, LIGHT, NORMAL, HEAVY }
 
@@ -496,12 +511,12 @@ func handle_stance_direction_change(old_stance: Stance, new_stance: Stance):
 		else:
 			# Use last known movement direction when idle
 			entering_stance_direction = last_movement_direction
-		print("Entering stance - preserving direction: ", entering_stance_direction)
+		print("PLAYER: Entering stance ", Stance.keys()[new_stance], " - Position: ", global_position, " - Direction: ", entering_stance_direction)
 	
 	# Exiting stance back to neutral - restore preserved direction
 	elif old_stance != Stance.NEUTRAL and new_stance == Stance.NEUTRAL:
 		# Don't immediately restore here - let update_stance_visual handle it
-		print("Exiting stance - will restore direction: ", entering_stance_direction)
+		print("PLAYER: Exiting stance - Position: ", global_position, " - Restored direction: ", entering_stance_direction)
 
 func update_stance_visual():
 	# Update animation and scale based on stance
@@ -891,6 +906,40 @@ func perfect_parry_success():
 	# Play perfect parry sound
 	if audio_manager and walking_audio:
 		audio_manager.play_perfect_parry_sfx(walking_audio)
+
+func update_dash_preview():
+	# Show simple dash line when in combat stance and ready to attack
+	if not dash_preview:
+		return
+		
+	# Only show dash preview if in combat stance, not stunned, not dashing, and cooldown ready
+	if current_stance != Stance.NEUTRAL and not is_stunned and not is_dashing and attack_cooldown_timer <= 0:
+		# Check if holding direction keys to determine if player wants to attack
+		var input_direction = Vector2.ZERO
+		if Input.is_action_pressed("move_up"):
+			input_direction += Vector2.UP
+		if Input.is_action_pressed("move_down"):
+			input_direction += Vector2.DOWN
+		if Input.is_action_pressed("move_left"):
+			input_direction += Vector2.LEFT
+		if Input.is_action_pressed("move_right"):
+			input_direction += Vector2.RIGHT
+		
+		var aim_direction: Vector2
+		if input_direction.length() > 0:
+			# Use the input direction for aim line (player is actively aiming)
+			aim_direction = input_direction
+		else:
+			# Show aim line in the direction player is currently facing (entering_stance_direction)
+			aim_direction = Vector2.from_angle(deg_to_rad(entering_stance_direction))
+		
+		# Calculate relative end position and show simple line
+		var dash_distance = dash_speed * dash_duration  # 600 * 0.6 = 360 pixels
+		var relative_end = aim_direction.normalized() * dash_distance
+		dash_preview.show_simple_dash_line(relative_end)
+	else:
+		# Hide trajectory if not in combat stance or conditions not met
+		dash_preview.hide_dash_trajectory()
 
 func update_attack_cooldown_bar_visibility():
 	# Show attack cooldown bar while charging until it's full

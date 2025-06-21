@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://djl7o4er2fb6w" path="res://Scripts/Enemy.gd" id="1_enemy_script"]
 [ext_resource type="Texture2D" uid="uid://bvb645moajooq" path="res://assets/test_sprites/idle_enemy.png" id="2_idle_sprite"]
+[ext_resource type="Script" path="res://Scripts/DashPreview.gd" id="3_dash_preview_script"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(26, 21)
@@ -134,6 +135,10 @@ offset_right = 30.0
 offset_bottom = -120.0
 max_value = 1.0
 show_percentage = false
+
+[node name="DashPreview" type="Line2D" parent="."]
+z_index = 10
+script = ExtResource("3_dash_preview_script")
 
 [node name="AudioPlayer" type="AudioStreamPlayer2D" parent="."]
 volume_db = -5.0
