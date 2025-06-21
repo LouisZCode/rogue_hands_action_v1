@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvst6aoyjb4br"
-path="res://.godot/imported/rock_player.png-fbc683c39c16cb23ee02a5b9ffd05872.ctex"
+uid="uid://cbni0vuqf62mi"
+path="res://.godot/imported/player_walking_hand.png-ebcbbb99b680635cd406f8d6a5ffadb8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/test_sprites/rock_player.png"
-dest_files=["res://.godot/imported/rock_player.png-fbc683c39c16cb23ee02a5b9ffd05872.ctex"]
+source_file="res://assets/assets_game/player_walking_hand.png"
+dest_files=["res://.godot/imported/player_walking_hand.png-ebcbbb99b680635cd406f8d6a5ffadb8.ctex"]
 
 [params]
 

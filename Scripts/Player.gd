@@ -53,16 +53,12 @@ var enemies_hit_this_dash: Array[Node] = []
 var current_animation_state: String = "idle"
 var movement_threshold: float = 10.0  # Minimum velocity to trigger walking animation
 
-# Idle bobbing effect
-var idle_bobbing_timer: float = 0.0
-var idle_bobbing_speed: float = 2.0
-var idle_bobbing_amplitude: float = 2.0
-var base_position: Vector2
+# Long idle system
+var idle_timer: float = 0.0
+var long_idle_delay: float = 5.0  # 5 seconds before long idle triggers
+var is_in_long_idle: bool = false
 
-# Breathing animation for idle state
-var breathing_timer: float = 0.0
-var breathing_speed: float = 1.0  # Slower than bobbing for realistic breathing
-var breathing_scale_amplitude: float = 0.03  # 3% scale variation
+var base_position: Vector2
 var base_scale: Vector2 = Vector2(1.0, 1.0)
 
 # Directional rotation
@@ -77,6 +73,7 @@ var previous_stance: Stance = Stance.NEUTRAL  # Track stance changes
 
 # References
 @onready var sprite: AnimatedSprite2D = $Sprite
+@onready var eye_sprite: AnimatedSprite2D = $EyeSprite
 @onready var stance_label: Label = $StanceLabel
 @onready var stun_indicator: Label = $StunIndicator
 @onready var attack_area: Area2D = $AttackArea
@@ -157,6 +154,9 @@ func _ready():
 	if attack_cooldown_bar:
 		attack_cooldown_bar.visible = false
 	
+	# Connect animation finished signal for long idle
+	sprite.animation_finished.connect(_on_animation_finished)
+	
 func _physics_process(delta):
 	handle_movement(delta)
 	handle_input()
@@ -176,6 +176,9 @@ func _physics_process(delta):
 	
 	# Update attack cooldown bar visibility - only show while charging and in idle/walking states
 	update_attack_cooldown_bar_visibility()
+	
+	# Update long idle timer
+	update_long_idle_timer(delta)
 	
 	# Update immunity frames
 	if immunity_timer > 0:
@@ -502,6 +505,17 @@ func get_current_input_direction() -> Vector2:
 	
 	return input_direction.normalized() if input_direction.length() > 0 else Vector2.ZERO
 
+func has_any_input() -> bool:
+	# Check if player is providing any input (movement or stance)
+	return Input.is_action_pressed("move_up") or \
+		   Input.is_action_pressed("move_down") or \
+		   Input.is_action_pressed("move_left") or \
+		   Input.is_action_pressed("move_right") or \
+		   Input.is_action_pressed("gesture_rock") or \
+		   Input.is_action_pressed("gesture_paper") or \
+		   Input.is_action_pressed("gesture_scissors") or \
+		   Input.is_action_pressed("attack")
+
 func handle_stance_direction_change(old_stance: Stance, new_stance: Stance):
 	# Entering a stance from neutral - preserve current direction
 	if old_stance == Stance.NEUTRAL and new_stance != Stance.NEUTRAL:
@@ -525,9 +539,14 @@ func update_stance_visual():
 			# Check if moving to determine idle vs walking
 			if velocity.length() > movement_threshold and not is_dashing and not is_stunned:
 				sprite.play("walking")
+				if eye_sprite:
+					eye_sprite.visible = true
+					eye_sprite.play("walking")
 				current_animation_state = "walking"
 			else:
 				sprite.play("idle")
+				if eye_sprite:
+					eye_sprite.visible = false
 				current_animation_state = "idle"
 			
 			# If we just exited a stance, restore the preserved direction
@@ -536,18 +555,24 @@ func update_stance_visual():
 				print("Restored direction after exiting stance: ", entering_stance_direction)
 		Stance.ROCK:
 			sprite.play("rock")
+			if eye_sprite:
+				eye_sprite.visible = false
 			sprite.rotation_degrees = entering_stance_direction  # Preserve direction when entering stance
 			sprite.position = base_position  # Reset position
 			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
 			current_animation_state = "rock"
 		Stance.PAPER:
-			sprite.play("paper") 
+			sprite.play("paper")
+			if eye_sprite:
+				eye_sprite.visible = false
 			sprite.rotation_degrees = entering_stance_direction  # Preserve direction when entering stance
 			sprite.position = base_position  # Reset position
 			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
 			current_animation_state = "paper"
 		Stance.SCISSORS:
 			sprite.play("scissors")
+			if eye_sprite:
+				eye_sprite.visible = false
 			sprite.rotation_degrees = entering_stance_direction  # Preserve direction when entering stance
 			sprite.position = base_position  # Reset position
 			if rotation_tween: rotation_tween.kill()  # Stop any rotation tweens
@@ -569,6 +594,9 @@ func update_animation_state(delta):
 		
 		if is_moving and current_animation_state != "walking":
 			sprite.play("walking")
+			if eye_sprite:
+				eye_sprite.visible = true
+				eye_sprite.play("walking")
 			current_animation_state = "walking"
 			# Start walking audio
 			if not is_walking_audio_playing:
@@ -576,6 +604,8 @@ func update_animation_state(delta):
 				is_walking_audio_playing = true
 		elif not is_moving and current_animation_state != "idle":
 			sprite.play("idle")
+			if eye_sprite:
+				eye_sprite.visible = false
 			current_animation_state = "idle"
 			# Stop walking audio
 			if is_walking_audio_playing:
@@ -589,17 +619,19 @@ func update_animation_state(delta):
 			if not is_dashing:
 				base_scale = Vector2(1.0, 1.0)
 			
-			# Vertical bobbing
-			idle_bobbing_timer += delta * idle_bobbing_speed
-			var bobbing_offset = sin(idle_bobbing_timer) * idle_bobbing_amplitude
-			sprite.position = base_position + Vector2(0, bobbing_offset)
-			
-			# Breathing scale animation (expand/contract)
-			breathing_timer += delta * breathing_speed
-			var breathing_scale = 1.0 + sin(breathing_timer) * breathing_scale_amplitude
-			# Only apply breathing scale if not dashing (preserve scale during dash)
+			# Simple static positioning and scaling (animation handled by spritesheet)
+			sprite.position = base_position
 			if not is_dashing:
-				sprite.scale = base_scale * breathing_scale
+				sprite.scale = base_scale
+			
+		"long_idle":
+			# Same as regular idle but for long idle animation
+			if not is_dashing:
+				base_scale = Vector2(1.0, 1.0)
+			
+			sprite.position = base_position
+			if not is_dashing:
+				sprite.scale = base_scale
 			
 		"walking":
 			# Only modify base_scale if not dashing (prevents corruption)
@@ -609,11 +641,14 @@ func update_animation_state(delta):
 			# Only set scale if not dashing (preserve scale during dash)
 			if not is_dashing:
 				sprite.scale = base_scale
+				if eye_sprite and eye_sprite.visible:
+					eye_sprite.position = sprite.position
+					eye_sprite.scale = sprite.scale
 			
 		"rock", "paper", "scissors":
 			# Only modify base_scale if not dashing (prevents corruption)
 			if not is_dashing:
-				base_scale = Vector2(0.16, 0.16)
+				base_scale = Vector2(0.24, 0.24)
 			sprite.position = base_position
 			# Only set scale if not dashing (preserve scale during dash)
 			if not is_dashing:
@@ -944,3 +979,39 @@ func update_attack_cooldown_bar_visibility():
 		var is_charging = attack_cooldown_timer > 0
 		
 		attack_cooldown_bar.visible = is_charging
+
+func update_long_idle_timer(delta):
+	# Check if player is truly idle (no movement, no input, in neutral stance)
+	var is_truly_idle = current_stance == Stance.NEUTRAL and \
+						velocity.length() <= movement_threshold and \
+						not has_any_input() and \
+						not is_dashing and \
+						not is_stunned
+	
+	if is_truly_idle:
+		idle_timer += delta
+		# Trigger long idle animation after delay
+		if idle_timer >= long_idle_delay and not is_in_long_idle:
+			trigger_long_idle()
+	else:
+		# Reset timer and exit long idle if any activity detected
+		idle_timer = 0.0
+		if is_in_long_idle:
+			exit_long_idle()
+
+func trigger_long_idle():
+	# Play the long idle animation once
+	is_in_long_idle = true
+	sprite.play("long_idle")
+	current_animation_state = "long_idle"
+	
+func exit_long_idle():
+	# Return to normal idle animation
+	is_in_long_idle = false
+	sprite.play("idle")
+	current_animation_state = "idle"
+
+func _on_animation_finished():
+	# Handle when long idle animation finishes (returns to normal idle)
+	if current_animation_state == "long_idle":
+		exit_long_idle()
