@@ -518,7 +518,18 @@ func attack_during_dash():
 					# Fallback if method doesn't exist
 					player_ref.take_damage(combat_result.damage)
 			elif combat_result.damage > 0:
-				player_ref.take_damage(combat_result.damage)
+				# V2: Handle weak stance damage absorption
+				if combat_result.weak_stance_damage and player_ref.has_method("consume_multiple_defense_points"):
+					# Try to absorb weak stance damage with defense points
+					var absorbed_damage = player_ref.consume_multiple_defense_points(combat_result.damage)
+					var remaining_damage = combat_result.damage - absorbed_damage
+					if absorbed_damage > 0:
+						print("Defense points absorbed ", absorbed_damage, " damage from weak stance!")
+					if remaining_damage > 0:
+						player_ref.take_damage(remaining_damage)
+				else:
+					# Regular damage application
+					player_ref.take_damage(combat_result.damage)
 			
 			# Handle enemy stun (parry success!)
 			if combat_result.enemy_stunned:
@@ -545,8 +556,8 @@ func calculate_damage(attacker_stance: Stance, defender_stance: Stance) -> int:
 		return 5   # Lose damage
 
 func calculate_combat_damage(enemy_stance: Stance, player_stance, is_mutual_attack: bool = false) -> Dictionary:
-	# Returns: {damage: int, enemy_stunned: bool, player_defense_consumed: bool}
-	var result = {"damage": 0, "enemy_stunned": false, "player_defense_consumed": false}
+	# Returns: {damage: int, enemy_stunned: bool, player_defense_consumed: bool, weak_stance_damage: bool}
+	var result = {"damage": 0, "enemy_stunned": false, "player_defense_consumed": false, "weak_stance_damage": false}
 	
 	var player_stance_int = int(player_stance)
 	var enemy_stance_int = int(enemy_stance)
@@ -578,8 +589,9 @@ func calculate_combat_damage(enemy_stance: Stance, player_stance, is_mutual_atta
 	elif (enemy_stance_int == 1 and player_stance_int == 3) or \
 		 (enemy_stance_int == 2 and player_stance_int == 1) or \
 		 (enemy_stance_int == 3 and player_stance_int == 2):
-		# Enemy wins
+		# Enemy wins - V2: Defense points can absorb weak stance damage
 		result.damage = 2
+		result.weak_stance_damage = true  # Mark this as weak stance damage for special handling
 	else:
 		# Enemy loses - check if player is in parry window for perfect parry
 		result.damage = 0

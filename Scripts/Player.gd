@@ -755,6 +755,30 @@ func consume_defense_point() -> bool:
 		return true
 	return false
 
+func restore_defense_point():
+	if current_defense_points < max_defense_points:
+		current_defense_points += 1
+		defense_points_changed.emit(current_defense_points, max_defense_points)
+		# Update defense circles visual
+		if defense_circles:
+			defense_circles.update_defense_points(current_defense_points)
+		# Play a positive feedback sound (could use perfect parry sound)
+		if audio_manager and walking_audio:
+			audio_manager.play_perfect_parry_sfx(walking_audio)
+
+func consume_multiple_defense_points(amount: int) -> int:
+	var consumed = min(amount, current_defense_points)
+	if consumed > 0:
+		current_defense_points -= consumed
+		defense_points_changed.emit(current_defense_points, max_defense_points)
+		# Update defense circles visual
+		if defense_circles:
+			defense_circles.update_defense_points(current_defense_points)
+		# Play defense point consumed sound
+		if audio_manager and walking_audio:
+			audio_manager.play_defense_point_consumed_sfx(walking_audio)
+	return consumed
+
 func apply_stun():
 	is_stunned = true
 	stun_timer = stun_duration
@@ -862,6 +886,8 @@ func perfect_parry_success():
 		parry_circle.show_perfect_parry_flash()
 	# Add screen shake for feedback
 	start_screen_shake(12.0, 0.3)
+	# V2: Restore defense point on perfect parry
+	restore_defense_point()
 	# Play perfect parry sound
 	if audio_manager and walking_audio:
 		audio_manager.play_perfect_parry_sfx(walking_audio)
