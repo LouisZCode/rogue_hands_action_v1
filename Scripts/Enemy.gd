@@ -968,8 +968,8 @@ func _on_detection_area_body_entered(body):
 			# Enhance detection range when player is spotted
 			enhance_detection_range()
 			# Play alert sound
-			if audio_manager and audio_player:
-				audio_manager.play_enemy_alert_sfx(audio_player)
+			# if audio_manager and audio_player:
+			#	audio_manager.play_enemy_alert_sfx(audio_player)
 			print("Enemy spotted player - ALERT!")
 		else:
 			# Was already in some other state, go directly to observing
@@ -998,8 +998,8 @@ func _on_detection_area_body_exited(body):
 				if lost_indicator:
 					lost_indicator.visible = true
 				# Play lost player sound
-				if audio_manager and audio_player:
-					audio_manager.play_enemy_lost_player_sfx(audio_player)
+				# if audio_manager and audio_player:
+				#	audio_manager.play_enemy_lost_player_sfx(audio_player)
 				print("DEBUG: Enemy confused - lost player during combat, timer set to: ", lost_player_timer)
 			else:
 				# Was just walking, return to walking immediately

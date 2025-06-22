@@ -7,21 +7,21 @@ class_name AudioManager
 
 # Combat SFX
 @export var perfect_parry_sfx: AudioStream = preload("res://assets/sfx/perfect_parry_sfx.mp3")
-@export var regular_block_sfx: AudioStream
-@export var player_attack_sfx: AudioStream
-@export var enemy_attack_sfx: AudioStream
+@export var regular_block_sfx: AudioStream = preload("res://assets/sfx/player_hit_heavy_sfx.mp3")
+@export var player_attack_sfx: AudioStream = preload("res://assets/sfx/player_attack_sfx.mp3")
+@export var enemy_attack_sfx: AudioStream = preload("res://assets/sfx/player_attack_sfx.mp3")
 @export var player_hit_sfx: AudioStream = preload("res://assets/sfx/player_hit_sfx.mp3")
-@export var enemy_hit_sfx: AudioStream
+@export var enemy_hit_sfx: AudioStream = preload("res://assets/sfx/enemy_hit_sfx.mp3")
 
 # Status Effect SFX
 @export var player_stun_sfx: AudioStream = preload("res://assets/sfx/player_stun_sfx.mp3")
 @export var enemy_stun_sfx: AudioStream = preload("res://assets/sfx/enemy_stun_sfx.mp3")
-@export var stance_change_sfx: AudioStream
 @export var defense_point_consumed_sfx: AudioStream = preload("res://assets/sfx/defense_point_consumed_sfx.mp3")
 
-# AI/Detection SFX
-@export var enemy_alert_sfx: AudioStream
-@export var enemy_lost_player_sfx: AudioStream
+# Stance Change SFX
+@export var player_stance_rock_sfx: AudioStream = preload("res://assets/sfx/player_stance_rock_sfx.mp3")
+@export var player_stance_paper_sfx: AudioStream = preload("res://assets/sfx/player_stance_paper_sfx.mp3")
+@export var player_stance_scissor_sfx: AudioStream = preload("res://assets/sfx/player_stance_scissor_sfx.mp3")
 
 # Game State SFX
 @export var player_death_sfx: AudioStream
@@ -83,25 +83,24 @@ func play_enemy_stun_sfx(audio_player: AudioStreamPlayer2D):
 		audio_player.stream = enemy_stun_sfx
 		audio_player.play()
 
-func play_stance_change_sfx(audio_player: AudioStreamPlayer2D):
-	if audio_player and stance_change_sfx:
-		audio_player.stream = stance_change_sfx
+func play_player_stance_rock_sfx(audio_player: AudioStreamPlayer2D):
+	if audio_player and player_stance_rock_sfx:
+		audio_player.stream = player_stance_rock_sfx
+		audio_player.play()
+
+func play_player_stance_paper_sfx(audio_player: AudioStreamPlayer2D):
+	if audio_player and player_stance_paper_sfx:
+		audio_player.stream = player_stance_paper_sfx
+		audio_player.play()
+
+func play_player_stance_scissor_sfx(audio_player: AudioStreamPlayer2D):
+	if audio_player and player_stance_scissor_sfx:
+		audio_player.stream = player_stance_scissor_sfx
 		audio_player.play()
 
 func play_defense_point_consumed_sfx(audio_player: AudioStreamPlayer2D):
 	if audio_player and defense_point_consumed_sfx:
 		audio_player.stream = defense_point_consumed_sfx
-		audio_player.play()
-
-# AI/Detection SFX Functions
-func play_enemy_alert_sfx(audio_player: AudioStreamPlayer2D):
-	if audio_player and enemy_alert_sfx:
-		audio_player.stream = enemy_alert_sfx
-		audio_player.play()
-
-func play_enemy_lost_player_sfx(audio_player: AudioStreamPlayer2D):
-	if audio_player and enemy_lost_player_sfx:
-		audio_player.stream = enemy_lost_player_sfx
 		audio_player.play()
 
 # Game State SFX Functions

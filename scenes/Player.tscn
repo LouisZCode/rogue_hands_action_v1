@@ -1523,6 +1523,7 @@ offset_left = -50.0
 offset_top = -50.0
 offset_right = 50.0
 offset_bottom = 50.0
+z_index = 4
 script = ExtResource("8_defense_script")
 
 [node name="AttackCooldownBar" type="ProgressBar" parent="."]

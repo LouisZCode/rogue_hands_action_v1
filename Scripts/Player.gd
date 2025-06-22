@@ -351,9 +351,17 @@ func change_stance(new_stance: Stance):
 				# print("DEBUG: Player changing to NEUTRAL stance - hiding defense circles")
 				defense_circles.hide_defense_circles()
 		
-		# Play stance change sound
+		# Play specific stance change sound
 		if audio_manager and walking_audio:
-			audio_manager.play_stance_change_sfx(walking_audio)
+			match new_stance:
+				Stance.ROCK:
+					audio_manager.play_player_stance_rock_sfx(walking_audio)
+				Stance.PAPER:
+					audio_manager.play_player_stance_paper_sfx(walking_audio)
+				Stance.SCISSORS:
+					audio_manager.play_player_stance_scissor_sfx(walking_audio)
+				Stance.NEUTRAL:
+					pass  # No sound when returning to neutral
 		
 		update_stance_visual()
 		stance_changed.emit(current_stance)

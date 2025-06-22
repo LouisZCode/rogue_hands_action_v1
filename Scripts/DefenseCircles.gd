@@ -19,7 +19,7 @@ func _draw():
 		# Draw current defense point circles
 		for i in range(current_defense_points):
 			var radius = base_radius + (i * circle_spacing)
-			draw_circle(Vector2(50, 50), radius, circle_color)  # Center at (50,50) for 100x100 control
+			draw_circle(Vector2(50, 50), radius, circle_color)  # Center of control
 		
 		# Draw fading circles (expansion animation)
 		for fade_data in fading_circles:
