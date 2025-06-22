@@ -140,16 +140,16 @@ func _ready():
 	queue_redraw()
 	
 	# Enable collision shape debugging
-	get_tree().debug_collisions_hint = true
+	# get_tree().debug_collisions_hint = true
 	
 	# Debug print collision sizes
-	print_collision_debug()
+	# print_collision_debug()
 	
 	# Fix collision layer setup
-	fix_collision_layers()
+	# fix_collision_layers()
 	
 	# Fix attack area size - it's way too small!
-	fix_attack_area_size()
+	# fix_attack_area_size()
 	
 	# Initialize walking behavior
 	pick_new_walking_direction()
@@ -502,7 +502,7 @@ func handle_dash_movement(delta):
 					pass
 			
 		# Check for player hits during dash
-		print("DEBUG: Calling attack_during_dash() - Enemy at: ", global_position)
+		# print("DEBUG: Calling attack_during_dash() - Enemy at: ", global_position)
 		attack_during_dash()
 
 func perform_dash_attack():
@@ -540,43 +540,49 @@ func perform_dash_attack():
 
 func attack_during_dash():
 	# DEBUG: Add comprehensive logging
-	print("=== ENEMY ATTACK_DURING_DASH DEBUG ===")
-	print("Enemy position: ", global_position)
-	print("Enemy is_dashing: ", is_dashing)
-	print("Enemy current_stance: ", Stance.keys()[current_stance])
+	# print("=== ENEMY ATTACK_DURING_DASH DEBUG ===")
+	# print("Enemy position: ", global_position)
+	# print("Enemy is_dashing: ", is_dashing)
+	# print("Enemy current_stance: ", Stance.keys()[current_stance])
 	
 	# Check for player hits using the actual attack area collision
 	var bodies = attack_area.get_overlapping_bodies()
-	print("Bodies found in attack_area: ", bodies.size())
+	# print("Bodies found in attack_area: ", bodies.size())
 	
 	if bodies.size() == 0:
-		print("DEBUG: NO BODIES FOUND - Attack area empty!")
+		# print("DEBUG: NO BODIES FOUND - Attack area empty!")
 		# Additional debug: Check if attack_area exists and is configured
 		if not attack_area:
-			print("ERROR: attack_area is null!")
+			# print("ERROR: attack_area is null!")
+			pass
 		else:
-			print("Attack area exists, checking collision shape...")
+			# print("Attack area exists, checking collision shape...")
 			var attack_collision = attack_area.get_child(0) as CollisionShape2D
 			if not attack_collision:
-				print("ERROR: No collision shape found in attack_area!")
+				# print("ERROR: No collision shape found in attack_area!")
+				pass
 			elif not attack_collision.shape:
-				print("ERROR: Collision shape is null!")
+				# print("ERROR: Collision shape is null!")
+				pass
 			else:
 				var shape = attack_collision.shape as CircleShape2D
 				if shape:
 					var effective_radius = shape.radius * attack_collision.scale.x
-					print("Attack collision shape radius: ", shape.radius)
-					print("Attack collision scale: ", attack_collision.scale)
-					print("Effective attack radius: ", effective_radius, "px")
-					print("Attack collision position: ", attack_collision.global_position)
+					# print("Attack collision shape radius: ", shape.radius)
+					# print("Attack collision scale: ", attack_collision.scale)
+					# print("Effective attack radius: ", effective_radius, "px")
+					# print("Attack collision position: ", attack_collision.global_position)
+					pass
 				else:
-					print("ERROR: Shape is not CircleShape2D!")
+					# print("ERROR: Shape is not CircleShape2D!")
+					pass
 	else:
-		print("Bodies found:")
+		# print("Bodies found:")
 		for i in range(bodies.size()):
 			var body = bodies[i]
-			print("  [", i, "] ", body.name, " (", body.get_class(), ") at ", body.global_position)
-			print("      Distance to enemy: ", global_position.distance_to(body.global_position))
+			# print("  [", i, "] ", body.name, " (", body.get_class(), ") at ", body.global_position)
+			# print("      Distance to enemy: ", global_position.distance_to(body.global_position))
+			pass
 	
 	# Check if player exists in scene
 	var player_ref = get_tree().get_first_node_in_group("player")

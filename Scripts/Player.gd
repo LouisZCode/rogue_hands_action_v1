@@ -411,8 +411,10 @@ func get_damage_category(final_damage: int, original_damage: int) -> DamageCateg
 	# Categorize damage for appropriate visual feedback
 	if final_damage <= 0:
 		return DamageCategory.NONE  # Perfect block or tie
-	elif final_damage <= 2 or original_damage != final_damage:  # Light damage or blocked
+	elif final_damage == 1 or original_damage != final_damage:  # Light damage or blocked
 		return DamageCategory.LIGHT
+	elif final_damage == 2:
+		return DamageCategory.NORMAL  # 2 damage gets proper medium feedback
 	elif final_damage <= 4:
 		return DamageCategory.NORMAL
 	else:

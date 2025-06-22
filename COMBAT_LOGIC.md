@@ -485,3 +485,129 @@ This section details the complete combat balance divided by the player's defensi
 - Existing defense point UI automatically reflects changes
 - Uses established `defense_points_changed` signal system
 - No additional UI changes required
+
+## Collision System Debugging Lessons
+
+This section documents critical lessons learned from debugging collision detection issues in the combat system.
+
+### Problem: Enemy Hits From Too Far Away
+
+**Initial Issue:**
+- Enemy was hitting player from 100px away instead of the expected 7.5px collision range
+- Player couldn't be hit at all after switching to proper collision detection
+
+**Root Causes Discovered:**
+
+#### 1. Wrong Collision Detection Method
+**Problem**: Using manual distance calculation instead of Godot's collision system
+```gdscript
+# ❌ WRONG - Manual distance check
+var distance = global_position.distance_to(player_ref.global_position)
+if distance <= attack_range:  # attack_range = 100.0
+
+# ✅ CORRECT - Use Godot's collision system
+var bodies = attack_area.get_overlapping_bodies()
+for body in bodies:
+    if body is Player:
+```
+
+**Lesson**: Always use `Area2D.get_overlapping_bodies()` instead of manual distance calculations for accurate collision detection.
+
+#### 2. Missing Collision Layers/Masks
+**Problem**: Area2D nodes couldn't detect CharacterBody2D nodes because collision layers weren't configured
+
+**Solution Applied:**
+```
+Player CharacterBody2D: collision_layer = 1
+Enemy CharacterBody2D: collision_layer = 2
+Enemy AttackArea: collision_mask = 1 (detects Player on layer 1)
+Player AttackArea: collision_mask = 2 (detects Enemy on layer 2)
+```
+
+**Lesson**: 
+- **Collision Layer**: What layer an object EXISTS on
+- **Collision Mask**: What layers an object can DETECT
+- Area2D nodes require proper collision_mask to detect bodies on specific layers
+
+#### 3. Scale vs Effective Collision Size
+**Problem**: CollisionShape2D had scale 0.3, making effective radius microscopic
+
+**Scale Impact:**
+- Base shape radius: 25.0px
+- With scale 0.3: 25.0 × 0.3 = 7.5px effective radius  
+- With scale 1.0: 25.0 × 1.0 = 25.0px effective radius
+
+**Lesson**: Always calculate effective collision size as `base_size × scale`. Visual sprite size ≠ collision size.
+
+#### 4. Collision Size Balance
+**Current Working Setup:**
+- **Player Body**: 12×12 rectangle (precise movement collision)
+- **Player Attack**: 22px circle radius (generous attack range)
+- **Enemy Body**: 26×21 rectangle (precise movement collision)  
+- **Enemy Attack**: 25px circle radius (matches player attack range)
+
+**Lesson**: Attack collision areas should be slightly larger than body collision areas for reliable hit detection.
+
+### Debugging Methodology That Worked
+
+#### 1. Comprehensive Logging
+```gdscript
+# Log collision area properties
+var bodies = attack_area.get_overlapping_bodies()
+print("Bodies found in attack_area: ", bodies.size())
+for body in bodies:
+    print("Body: ", body.name, " at ", body.global_position)
+
+# Log effective collision sizes  
+var effective_radius = shape.radius * collision_shape.scale.x
+print("Effective attack radius: ", effective_radius, "px")
+```
+
+#### 2. Visual Debugging
+- Enabled `get_tree().debug_collisions_hint = true` to see collision shapes
+- Added colored sprite modulation during attacks for visibility
+- Used console output to track exactly what was/wasn't being detected
+
+#### 3. Layer/Mask Verification
+```gdscript
+print("Enemy collision_layer: ", collision_layer)
+print("Enemy attack_area collision_mask: ", attack_area.collision_mask)
+```
+
+### Key Technical Lessons
+
+1. **Use Godot's Built-in Systems**: `get_overlapping_bodies()` is more reliable than manual distance checks
+2. **Collision Layers Are Essential**: Area2D detection requires proper layer/mask configuration
+3. **Scale Affects Everything**: Always multiply base collision size by scale for true effective size
+4. **Size Balance Matters**: Attack areas need appropriate sizing relative to body collision areas
+5. **Debug Systematically**: Log collision properties, visualize shapes, verify layer setup
+
+### Fixed Implementation
+
+**Scene Setup (.tscn files):**
+```
+Player CharacterBody2D:
+  collision_layer = 1
+  CollisionShape2D: RectangleShape2D size=(12,12)
+  AttackArea Area2D:
+    collision_mask = 2
+    CollisionShape2D: CircleShape2D radius=22.0
+
+Enemy CharacterBody2D:
+  collision_layer = 2  
+  CollisionShape2D: RectangleShape2D size=(26,21)
+  AttackArea Area2D:
+    collision_mask = 1
+    CollisionShape2D: CircleShape2D radius=25.0, scale=(1.0,1.0)
+```
+
+**Code Implementation:**
+```gdscript
+func attack_during_dash():
+    var bodies = attack_area.get_overlapping_bodies()
+    for body in bodies:
+        if body is Player and not body in players_hit_this_dash:
+            # Process hit with proper collision detection
+```
+
+This collision system now provides pixel-perfect accuracy matching the visual representation.
