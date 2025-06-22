@@ -157,6 +157,9 @@ func _ready():
 	# Connect animation finished signal for long idle
 	sprite.animation_finished.connect(_on_animation_finished)
 	
+	# Debug initial long idle values
+	# print("DEBUG: Long idle system initialized - delay: ", long_idle_delay, " is_in_long_idle: ", is_in_long_idle)
+	
 func _physics_process(delta):
 	handle_movement(delta)
 	handle_input()
@@ -179,6 +182,15 @@ func _physics_process(delta):
 	
 	# Update long idle timer
 	update_long_idle_timer(delta)
+	
+	# Debug: Manual long idle trigger (press L key)
+	# if Input.is_action_just_pressed("ui_select") or Input.is_key_pressed(KEY_L):
+	#	print("DEBUG: Manual long idle trigger pressed!")
+	#	if not is_in_long_idle:
+	#		trigger_long_idle()
+	#	else:
+	#		exit_long_idle()
+	#	pass
 	
 	# Sync eye sprite rotation continuously
 	sync_eye_sprite_rotation()
@@ -522,17 +534,18 @@ func has_any_input() -> bool:
 	var has_input = move_up or move_down or move_left or move_right or rock or paper or scissors or attack
 	
 	# Debug which inputs are active (only when there are inputs)
-	if has_input:
-		var active_inputs = []
-		if move_up: active_inputs.append("UP")
-		if move_down: active_inputs.append("DOWN")
-		if move_left: active_inputs.append("LEFT")
-		if move_right: active_inputs.append("RIGHT")
-		if rock: active_inputs.append("ROCK")
-		if paper: active_inputs.append("PAPER")
-		if scissors: active_inputs.append("SCISSORS")
-		if attack: active_inputs.append("ATTACK")
-		print("DEBUG: Active inputs: ", active_inputs)
+	# if has_input:
+	#	var active_inputs = []
+	#	if move_up: active_inputs.append("UP")
+	#	if move_down: active_inputs.append("DOWN")
+	#	if move_left: active_inputs.append("LEFT")
+	#	if move_right: active_inputs.append("RIGHT")
+	#	if rock: active_inputs.append("ROCK")
+	#	if paper: active_inputs.append("PAPER")
+	#	if scissors: active_inputs.append("SCISSORS")
+	#	if attack: active_inputs.append("ATTACK")
+	#	print("DEBUG: Active inputs: ", active_inputs)
+	#	pass
 	
 	return has_input
 
@@ -623,7 +636,7 @@ func update_animation_state(delta):
 			if not is_walking_audio_playing:
 				audio_manager.play_walking_sound(walking_audio)
 				is_walking_audio_playing = true
-		elif not is_moving and current_animation_state != "idle":
+		elif not is_moving and current_animation_state != "idle" and not is_in_long_idle:
 			sprite.play("idle")
 			if eye_sprite:
 				eye_sprite.visible = true
@@ -1011,36 +1024,29 @@ func update_long_idle_timer(delta):
 						not is_dashing and \
 						not is_stunned
 	
-	# Debug logging every 2 seconds
-	if int(idle_timer) % 2 == 0 and idle_timer > 0:
-		print("DEBUG: Long idle timer: ", idle_timer, " - Truly idle: ", is_truly_idle)
-		print("  - Stance: ", Stance.keys()[current_stance], " - Velocity: ", velocity.length())
-		print("  - Has input: ", has_any_input(), " - Dashing: ", is_dashing, " - Stunned: ", is_stunned)
+	# Debug logging every 2 seconds (reduced verbosity)
+	# if int(idle_timer) % 2 == 0 and idle_timer > 0 and idle_timer < 6:
+	#	print("DEBUG: Long idle timer: ", idle_timer, " - Truly idle: ", is_truly_idle)
+	#	pass
 	
 	if is_truly_idle:
 		idle_timer += delta
-		# Detailed trigger condition debugging
-		if idle_timer >= long_idle_delay:
-			print("DEBUG: Timer condition met! Timer: ", idle_timer, " >= Delay: ", long_idle_delay)
-			print("DEBUG: is_in_long_idle: ", is_in_long_idle)
-			print("DEBUG: not is_in_long_idle: ", not is_in_long_idle)
-			print("DEBUG: Full trigger condition: ", idle_timer >= long_idle_delay and not is_in_long_idle)
-		
 		# Trigger long idle animation after delay
 		if idle_timer >= long_idle_delay and not is_in_long_idle:
-			print("DEBUG: Triggering long idle animation at timer: ", idle_timer)
+			# print("DEBUG: Triggering long idle animation at timer: ", idle_timer)
 			trigger_long_idle()
 	else:
 		# Reset timer and exit long idle if any activity detected
 		if idle_timer > 0:
-			print("DEBUG: Resetting idle timer - was: ", idle_timer)
+			# print("DEBUG: Resetting idle timer - was: ", idle_timer)
+			pass
 		idle_timer = 0.0
 		if is_in_long_idle:
 			exit_long_idle()
 
 func trigger_long_idle():
 	# Play the long idle animation once
-	print("DEBUG: Long idle triggered! Setting animation to 'long_idle'")
+	# print("DEBUG: Long idle triggered! Setting animation to 'long_idle'")
 	is_in_long_idle = true
 	sprite.play("long_idle")
 	current_animation_state = "long_idle"
