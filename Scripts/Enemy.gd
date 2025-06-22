@@ -93,6 +93,7 @@ var audio_manager: AudioManager
 
 # Debug visualization
 var debug_detection_range: bool = true  # Set to false to hide
+var debug_attack_range: bool = true  # Show attack collision area
 var base_detection_radius: float = 150.0  # Normal detection range
 var enhanced_detection_radius: float = 300.0  # When player is spotted (double size)
 var current_detection_radius: float = 150.0  # Current radius for drawing
@@ -135,6 +136,21 @@ func _ready():
 	if debug_detection_range:
 		queue_redraw()
 	
+	# Always redraw to show attack area during debugging
+	queue_redraw()
+	
+	# Enable collision shape debugging
+	get_tree().debug_collisions_hint = true
+	
+	# Debug print collision sizes
+	print_collision_debug()
+	
+	# Fix collision layer setup
+	fix_collision_layers()
+	
+	# Fix attack area size - it's way too small!
+	fix_attack_area_size()
+	
 	# Initialize walking behavior
 	pick_new_walking_direction()
 	walking_timer = direction_change_interval
@@ -150,6 +166,10 @@ func _ready():
 		attack_timer_bar.visible = false
 	
 func _physics_process(delta):
+	# DEBUG: Show dash state
+	if is_dashing:
+		print("DEBUG _physics_process: Enemy is dashing - position: ", global_position, " dash_timer: ", dash_timer)
+	
 	update_ai(delta)
 	update_timers(delta)
 	handle_dash_movement(delta)
@@ -464,6 +484,9 @@ func handle_dash_movement(delta):
 			update_visual()
 			current_state = AIState.RETREATING
 			retreat_timer = 1.0
+			# Hide debug attack range when dash ends
+			if debug_attack_range:
+				queue_redraw()
 		else:
 			velocity = dash_direction * dash_speed
 			
@@ -479,6 +502,7 @@ func handle_dash_movement(delta):
 					pass
 			
 		# Check for player hits during dash
+		print("DEBUG: Calling attack_during_dash() - Enemy at: ", global_position)
 		attack_during_dash()
 
 func perform_dash_attack():
@@ -499,6 +523,12 @@ func perform_dash_attack():
 		var dash_color = stance_colors[current_stance].lerp(Color.WHITE, 0.5)
 		sprite.modulate = dash_color
 		
+		# DEBUG: Make enemy glow bright red during attack for visibility
+		if debug_attack_range:
+			sprite.modulate = Color.RED
+			debug_draw_attack_area()
+			queue_redraw()
+		
 		# Reset color after dash
 		var tween = create_tween()
 		tween.tween_interval(dash_duration)
@@ -509,42 +539,98 @@ func perform_dash_attack():
 		print("Enemy dash attacks with: ", Stance.keys()[current_stance], " towards stored target position")
 
 func attack_during_dash():
-	if player_ref and not player_ref in players_hit_this_dash:
-		var distance = global_position.distance_to(player_ref.global_position)
-		if distance <= attack_range:
+	# DEBUG: Add comprehensive logging
+	print("=== ENEMY ATTACK_DURING_DASH DEBUG ===")
+	print("Enemy position: ", global_position)
+	print("Enemy is_dashing: ", is_dashing)
+	print("Enemy current_stance: ", Stance.keys()[current_stance])
+	
+	# Check for player hits using the actual attack area collision
+	var bodies = attack_area.get_overlapping_bodies()
+	print("Bodies found in attack_area: ", bodies.size())
+	
+	if bodies.size() == 0:
+		print("DEBUG: NO BODIES FOUND - Attack area empty!")
+		# Additional debug: Check if attack_area exists and is configured
+		if not attack_area:
+			print("ERROR: attack_area is null!")
+		else:
+			print("Attack area exists, checking collision shape...")
+			var attack_collision = attack_area.get_child(0) as CollisionShape2D
+			if not attack_collision:
+				print("ERROR: No collision shape found in attack_area!")
+			elif not attack_collision.shape:
+				print("ERROR: Collision shape is null!")
+			else:
+				var shape = attack_collision.shape as CircleShape2D
+				if shape:
+					var effective_radius = shape.radius * attack_collision.scale.x
+					print("Attack collision shape radius: ", shape.radius)
+					print("Attack collision scale: ", attack_collision.scale)
+					print("Effective attack radius: ", effective_radius, "px")
+					print("Attack collision position: ", attack_collision.global_position)
+				else:
+					print("ERROR: Shape is not CircleShape2D!")
+	else:
+		print("Bodies found:")
+		for i in range(bodies.size()):
+			var body = bodies[i]
+			print("  [", i, "] ", body.name, " (", body.get_class(), ") at ", body.global_position)
+			print("      Distance to enemy: ", global_position.distance_to(body.global_position))
+	
+	# Check if player exists in scene
+	var player_ref = get_tree().get_first_node_in_group("player")
+	if player_ref:
+		var distance_to_player = global_position.distance_to(player_ref.global_position)
+		print("Player found in scene at: ", player_ref.global_position)
+		print("Distance to player: ", distance_to_player, "px")
+		print("Player collision layers: ", player_ref.collision_layer)
+		print("Player collision mask: ", player_ref.collision_mask)
+		print("Enemy collision layers: ", collision_layer)
+		print("Enemy collision mask: ", collision_mask)
+		print("Attack area collision layers: ", attack_area.collision_layer)
+		print("Attack area collision mask: ", attack_area.collision_mask)
+	else:
+		print("ERROR: No player found in scene!")
+	
+	print("Players already hit this dash: ", players_hit_this_dash.size())
+	print("=== END DEBUG ===")
+	
+	for body in bodies:
+		if body is Player and not body in players_hit_this_dash:
 			# Detect combat scenario: mutual attack or attack vs defense
-			var is_mutual_attack = detect_mutual_attack_with_player()
+			var is_mutual_attack = detect_mutual_attack_with_body(body)
 			# Calculate combat result based on stance matchup and scenario
-			var combat_result = calculate_combat_damage(current_stance, player_ref.current_stance, is_mutual_attack)
+			var combat_result = calculate_combat_damage(current_stance, body.current_stance, is_mutual_attack)
 			
 			# Handle defense point consumption
 			if combat_result.player_defense_consumed:
-				if player_ref.has_method("consume_defense_point"):
-					if player_ref.consume_defense_point():
+				if body.has_method("consume_defense_point"):
+					if body.consume_defense_point():
 						print("Player blocked with defense point!")
 						# Play regular block sound (successful block outside parry window)
-						if player_ref.audio_manager and player_ref.walking_audio:
-							player_ref.audio_manager.play_regular_block_sfx(player_ref.walking_audio)
+						if body.audio_manager and body.walking_audio:
+							body.audio_manager.play_regular_block_sfx(body.walking_audio)
 					else:
 						# No defense points left, take damage instead (reduced for same-stance balance)
 						combat_result.damage = 1
-						player_ref.take_damage(combat_result.damage)
+						body.take_damage(combat_result.damage)
 				else:
 					# Fallback if method doesn't exist
-					player_ref.take_damage(combat_result.damage)
+					body.take_damage(combat_result.damage)
 			elif combat_result.damage > 0:
 				# V2: Handle weak stance damage absorption
-				if combat_result.weak_stance_damage and player_ref.has_method("consume_multiple_defense_points"):
+				if combat_result.weak_stance_damage and body.has_method("consume_multiple_defense_points"):
 					# Try to absorb weak stance damage with defense points
-					var absorbed_damage = player_ref.consume_multiple_defense_points(combat_result.damage)
+					var absorbed_damage = body.consume_multiple_defense_points(combat_result.damage)
 					var remaining_damage = combat_result.damage - absorbed_damage
 					if absorbed_damage > 0:
 						print("Defense points absorbed ", absorbed_damage, " damage from weak stance!")
 					if remaining_damage > 0:
-						player_ref.take_damage(remaining_damage)
+						body.take_damage(remaining_damage)
 				else:
 					# Regular damage application
-					player_ref.take_damage(combat_result.damage)
+					body.take_damage(combat_result.damage)
 			
 			# Handle enemy stun (parry success!)
 			if combat_result.enemy_stunned:
@@ -556,7 +642,7 @@ func attack_during_dash():
 					pass
 			
 			# Add player to the list of already hit players
-			players_hit_this_dash.append(player_ref)
+			players_hit_this_dash.append(body)
 			print("Enemy attack result: ", combat_result.damage, " damage (mutual: ", is_mutual_attack, ")")
 
 func calculate_damage(attacker_stance: Stance, defender_stance: Stance) -> int:
@@ -925,6 +1011,118 @@ func _draw():
 		
 		draw_circle(Vector2.ZERO, current_detection_radius, circle_color)  
 		draw_arc(Vector2.ZERO, current_detection_radius, 0, TAU, 64, outline_color, 3.0)
+	
+	# Draw debug attack area (always visible for debugging)
+	if attack_area:
+		var attack_collision = attack_area.get_child(0) as CollisionShape2D
+		if attack_collision and attack_collision.shape:
+			var shape = attack_collision.shape as CircleShape2D
+			if shape:
+				var effective_radius = shape.radius * attack_collision.scale.x
+				# Draw attack area in bright yellow during dash, blue when not dashing
+				var attack_color = Color.YELLOW if is_dashing else Color.CYAN
+				draw_circle(Vector2.ZERO, effective_radius, Color(attack_color.r, attack_color.g, attack_color.b, 0.3))
+				draw_arc(Vector2.ZERO, effective_radius, 0, TAU, 32, attack_color, 2.0)
+
+func debug_draw_attack_area():
+	# Alternative method: Draw attack collision using Shape2D.draw()
+	if debug_attack_range and is_dashing and attack_area:
+		var attack_collision = attack_area.get_child(0) as CollisionShape2D
+		if attack_collision and attack_collision.shape:
+			# Get the actual collision shape and draw it
+			var shape = attack_collision.shape as CircleShape2D
+			if shape:
+				# Draw with proper scale applied
+				var actual_radius = shape.radius * attack_collision.scale.x  # 25.0 * 0.3 = 7.5px
+				print("DEBUG: Attack area radius = ", actual_radius, "px")
+
+func print_collision_debug():
+	print("=== ENEMY COLLISION DEBUG ===")
+	print("Enemy sprite scale: ", sprite.scale)
+	print("Enemy sprite effective size: ", 64 * sprite.scale.x, "x", 64 * sprite.scale.y)
+	
+	# Enemy body collision
+	var body_collision = get_node("CollisionShape2D") as CollisionShape2D
+	if body_collision and body_collision.shape:
+		var body_shape = body_collision.shape as RectangleShape2D
+		if body_shape:
+			print("Enemy body collision: ", body_shape.size, " at position ", body_collision.position)
+	
+	# Enemy attack area
+	if attack_area:
+		var attack_collision = attack_area.get_child(0) as CollisionShape2D
+		if attack_collision and attack_collision.shape:
+			var attack_shape = attack_collision.shape as CircleShape2D
+			if attack_shape:
+				var effective_radius = attack_shape.radius * attack_collision.scale.x
+				print("Enemy attack collision: radius ", attack_shape.radius, " * scale ", attack_collision.scale.x, " = ", effective_radius, "px")
+	
+	# Player collision (for reference)
+	var player = get_tree().get_first_node_in_group("player")
+	if player:
+		print("Player sprite scale: ", player.sprite.scale)
+		print("Player sprite effective size: ", 64 * player.sprite.scale.x, "x", 64 * player.sprite.scale.y)
+		var player_collision = player.get_node("CollisionShape2D") as CollisionShape2D
+		if player_collision and player_collision.shape:
+			var player_shape = player_collision.shape as RectangleShape2D
+			if player_shape:
+				print("Player body collision: ", player_shape.size)
+	print("=== END COLLISION DEBUG ===")
+
+func fix_collision_layers():
+	# Ensure proper collision layer setup for Area2D detection
+	print("=== FIXING COLLISION LAYERS ===")
+	
+	# Set enemy collision layer to 2, mask to 1 (to detect player)
+	collision_layer = 2
+	collision_mask = 1
+	print("Enemy body - layer: ", collision_layer, " mask: ", collision_mask)
+	
+	# Set attack area mask to detect player on layer 1
+	if attack_area:
+		attack_area.collision_mask = 1  # Detect bodies on layer 1
+		print("Enemy attack area - mask: ", attack_area.collision_mask)
+	
+	# Check player collision setup
+	var player = get_tree().get_first_node_in_group("player")
+	if player:
+		player.collision_layer = 1  # Player on layer 1
+		player.collision_mask = 2   # Player detects enemies on layer 2
+		print("Player body - layer: ", player.collision_layer, " mask: ", player.collision_mask)
+		
+		# Set player attack area mask to detect enemies on layer 2
+		var player_attack_area = player.get_node("AttackArea") as Area2D
+		if player_attack_area:
+			player_attack_area.collision_mask = 2  # Detect enemies on layer 2
+			print("Player attack area - mask: ", player_attack_area.collision_mask)
+	
+	print("=== COLLISION LAYERS FIXED ===")
+
+func fix_attack_area_size():
+	# The enemy attack area scale is 0.3, making it only 7.5px radius - way too small!
+	print("=== FIXING ATTACK AREA SIZE ===")
+	
+	if attack_area:
+		var attack_collision = attack_area.get_child(0) as CollisionShape2D
+		if attack_collision:
+			# Change scale from 0.3 to 1.0 for reasonable attack range
+			# This makes the radius 25px instead of 7.5px
+			attack_collision.scale = Vector2(1.0, 1.0)
+			print("Enemy attack area scale changed from 0.3 to 1.0")
+			print("New effective radius: 25px (was 7.5px)")
+			
+			# Compare with player attack area
+			var player = get_tree().get_first_node_in_group("player")
+			if player:
+				var player_attack_area = player.get_node("AttackArea") as Area2D
+				if player_attack_area:
+					var player_attack_collision = player_attack_area.get_child(0) as CollisionShape2D
+					if player_attack_collision and player_attack_collision.shape:
+						var player_shape = player_attack_collision.shape as CircleShape2D
+						if player_shape:
+							print("Player attack radius for comparison: ", player_shape.radius, "px")
+	
+	print("=== ATTACK AREA SIZE FIXED ===")
 
 func enhance_detection_range():
 	# Double the detection range when player is spotted
@@ -1045,6 +1243,12 @@ func detect_mutual_attack_with_player() -> bool:
 	# Check if player is also dashing (mutual attack scenario)
 	if player_ref and player_ref.has_method("is_currently_dashing"):
 		return player_ref.is_currently_dashing()
+	return false
+
+func detect_mutual_attack_with_body(body) -> bool:
+	# Check if the given body (player) is also dashing (mutual attack scenario)
+	if body and body.has_method("is_currently_dashing"):
+		return body.is_currently_dashing()
 	return false
 
 func _on_attack_area_body_entered(body):
