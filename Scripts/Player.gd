@@ -546,7 +546,8 @@ func update_stance_visual():
 			else:
 				sprite.play("idle")
 				if eye_sprite:
-					eye_sprite.visible = false
+					eye_sprite.visible = true
+					eye_sprite.play("idle")
 				current_animation_state = "idle"
 			
 			# If we just exited a stance, restore the preserved direction
@@ -605,7 +606,8 @@ func update_animation_state(delta):
 		elif not is_moving and current_animation_state != "idle":
 			sprite.play("idle")
 			if eye_sprite:
-				eye_sprite.visible = false
+				eye_sprite.visible = true
+				eye_sprite.play("idle")
 			current_animation_state = "idle"
 			# Stop walking audio
 			if is_walking_audio_playing:
@@ -623,6 +625,9 @@ func update_animation_state(delta):
 			sprite.position = base_position
 			if not is_dashing:
 				sprite.scale = base_scale
+				if eye_sprite and eye_sprite.visible:
+					eye_sprite.position = sprite.position
+					eye_sprite.scale = sprite.scale * 0.5
 			
 		"long_idle":
 			# Same as regular idle but for long idle animation
@@ -643,7 +648,7 @@ func update_animation_state(delta):
 				sprite.scale = base_scale
 				if eye_sprite and eye_sprite.visible:
 					eye_sprite.position = sprite.position
-					eye_sprite.scale = sprite.scale
+					eye_sprite.scale = sprite.scale * 0.5
 			
 		"rock", "paper", "scissors":
 			# Only modify base_scale if not dashing (prevents corruption)
