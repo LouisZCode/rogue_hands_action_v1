@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/EnemyData.gd" id="1_15boc"]
+
+[resource]
+script = ExtResource("1_15boc")
+enemy_name = "Elite Rock Destroyer"
+max_health = 12
+max_defense_points = 3
+speed = 70.0
+dash_speed = 200.0
+dash_duration = 1.2
+detection_type = 0
+instant_detection = true
+detection_radius = 350.0
+detection_range = 150.0
+enhanced_detection_radius = 300.0
+vision_angle = 80.0
+vision_range = 180.0
+vision_collision_mask = 2
+attack_cooldown = 2.5
+attack_range = 140.0
+damage_multiplier = 2.0
+stun_duration = 3.0
+neutral_probability = 5.0
+rock_probability = 70.0
+paper_probability = 15.0
+scissors_probability = 10.0
+stance_to_dash_delay = 1.8
+stance_decision_timer = 0.6
+positioning_timer_min = 1.0
+positioning_timer_max = 2.0
+retreat_timer = 0.4
+aggression_level = 0.5
+can_react = true
+reaction_chance = 0.8
+reaction_time = 0.8
+sprite_texture_path = "res://assets/test_sprites/rock_enemy.png"
+sprite_scale = Vector2(0.3, 0.3)
+color_tint = Color(0.6, 0.1, 0.1, 1)
+body_collision_size = Vector2(40, 32)
+attack_radius = 40.0
+attack_collision_scale = Vector2(1.5, 1.5)

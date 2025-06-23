@@ -164,6 +164,33 @@ func apply_collision_settings():
 		circle_shape.radius = enemy_data.attack_radius
 		attack_collision.scale = enemy_data.attack_collision_scale
 
+func apply_visual_data():
+	"""Apply visual customization from enemy data"""
+	if not enemy_data:
+		return
+	
+	# Get sprite node
+	var sprite_node = get_node("Sprite") as Sprite2D
+	if not sprite_node:
+		print("ERROR: No Sprite node found for visual data application")
+		return
+	
+	# Load texture from resource path
+	if enemy_data.sprite_texture_path != "":
+		var texture = load(enemy_data.sprite_texture_path) as Texture2D
+		if texture:
+			sprite_node.texture = texture
+			print("Loaded sprite texture: ", enemy_data.sprite_texture_path)
+		else:
+			print("WARNING: Failed to load sprite texture: ", enemy_data.sprite_texture_path)
+	
+	# Apply scale
+	sprite_node.scale = enemy_data.sprite_scale
+	
+	# Apply color tint
+	sprite_node.modulate = enemy_data.color_tint
+	
+	print("Applied visual data - Scale: ", enemy_data.sprite_scale, " Tint: ", enemy_data.color_tint)
 
 func apply_enemy_data():
 	"""Apply enemy data to all relevant systems"""
@@ -197,6 +224,9 @@ func apply_enemy_data():
 	
 	# Apply collision settings
 	apply_collision_settings()
+	
+	# Apply visual settings
+	apply_visual_data()
 	
 	# Emit defense points changed signal
 	enemy_defense_points_changed.emit(current_defense_points, max_defense_points)
@@ -1291,6 +1321,12 @@ func can_see_player() -> bool:
 
 func update_vision_detection():
 	"""Update vision-based player detection"""
+	# Check for instant detection first
+	if enemy_data and enemy_data.instant_detection:
+		check_instant_detection()
+		return
+	
+	# Use normal vision-based detection
 	var player_visible = can_see_player()
 	
 	if player_visible:
@@ -1305,6 +1341,25 @@ func update_vision_detection():
 		# Player not visible - handle loss of sight
 		if player_ref:
 			_handle_player_lost()
+
+func check_instant_detection():
+	"""Instant detection system - detects player immediately within detection_radius"""
+	if not player_ref:
+		player_ref = get_tree().get_first_node_in_group("player")
+	
+	if player_ref:
+		var distance_to_player = global_position.distance_to(player_ref.global_position)
+		var detection_radius = enemy_data.detection_radius if enemy_data else 500.0
+		
+		if distance_to_player <= detection_radius:
+			# Player is within instant detection range
+			if current_state in [AIState.IDLE, AIState.WALKING]:
+				_handle_player_detected()
+				print("Instant detection triggered! Enemy immediately spotted player at distance: ", distance_to_player)
+		else:
+			# Player is outside detection radius
+			if player_ref:
+				_handle_player_lost()
 
 func _handle_player_detected():
 	"""Handle when player is detected via vision"""
@@ -1353,11 +1408,11 @@ func _handle_player_lost():
 			lost_player_timer = lost_player_duration
 			if lost_indicator:
 				lost_indicator.visible = true
-			print("Enemy lost sight of player")
+			# print("Enemy lost sight of player")
 		else:
 			# Was just walking around, return to normal patrol
 			current_state = AIState.WALKING
-			print("Enemy lost sight of player (returning to patrol)")
+			# print("Enemy lost sight of player (returning to patrol)")
 
 func update_enemy_dash_preview():
 	# Show simple trajectory line from enemy position to target when attacking

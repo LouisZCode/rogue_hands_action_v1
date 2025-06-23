@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/EnemyData.gd" id="1_lc7ug"]
+
+[resource]
+script = ExtResource("1_lc7ug")
+enemy_name = "Lightning Scissor"
+max_health = 2
+max_defense_points = 1
+speed = 200.0
+dash_speed = 600.0
+dash_duration = 0.2
+detection_type = 0
+instant_detection = true
+detection_radius = 800.0
+detection_range = 150.0
+enhanced_detection_radius = 300.0
+vision_angle = 60.0
+vision_range = 150.0
+vision_collision_mask = 2
+attack_cooldown = 0.4
+attack_range = 50.0
+damage_multiplier = 0.5
+stun_duration = 3.0
+neutral_probability = 2.0
+rock_probability = 5.0
+paper_probability = 8.0
+scissors_probability = 85.0
+stance_to_dash_delay = 0.3
+stance_decision_timer = 0.05
+positioning_timer_min = 1.0
+positioning_timer_max = 2.0
+retreat_timer = 0.2
+aggression_level = 2.5
+can_react = true
+reaction_chance = 0.9
+reaction_time = 0.3
+sprite_texture_path = "res://assets/test_sprites/scissor_enemy.png"
+sprite_scale = Vector2(0.14, 0.14)
+color_tint = Color(1.5, 1, 0, 1)
+body_collision_size = Vector2(16, 12)
+attack_radius = 15.0
+attack_collision_scale = Vector2(0.6, 0.6)

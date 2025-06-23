@@ -86,16 +86,19 @@ func play_enemy_stun_sfx(audio_player: AudioStreamPlayer2D):
 func play_player_stance_rock_sfx(audio_player: AudioStreamPlayer2D):
 	if audio_player and player_stance_rock_sfx:
 		audio_player.stream = player_stance_rock_sfx
+		audio_player.pitch_scale = 1.0  # Normal speed for rock sound
 		audio_player.play()
 
 func play_player_stance_paper_sfx(audio_player: AudioStreamPlayer2D):
 	if audio_player and player_stance_paper_sfx:
 		audio_player.stream = player_stance_paper_sfx
+		audio_player.pitch_scale = 1.0  # Normal speed for paper sound
 		audio_player.play()
 
 func play_player_stance_scissor_sfx(audio_player: AudioStreamPlayer2D):
 	if audio_player and player_stance_scissor_sfx:
 		audio_player.stream = player_stance_scissor_sfx
+		audio_player.pitch_scale = 2.0  # Double speed for scissor sound
 		audio_player.play()
 
 func play_defense_point_consumed_sfx(audio_player: AudioStreamPlayer2D):

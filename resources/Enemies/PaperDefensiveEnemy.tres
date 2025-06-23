@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/EnemyData.gd" id="1_v1bxj"]
+
+[resource]
+script = ExtResource("1_v1bxj")
+enemy_name = "Paper Defensive Enemy"
+max_health = 6
+max_defense_points = 3
+speed = 110.0
+dash_speed = 320.0
+dash_duration = 0.5
+detection_type = 0
+instant_detection = false
+detection_radius = 500.0
+detection_range = 150.0
+enhanced_detection_radius = 300.0
+vision_angle = 120.0
+vision_range = 250.0
+vision_collision_mask = 2
+attack_cooldown = 1.0
+attack_range = 100.0
+damage_multiplier = 1.0
+stun_duration = 3.0
+neutral_probability = 20.0
+rock_probability = 15.0
+paper_probability = 50.0
+scissors_probability = 15.0
+stance_to_dash_delay = 0.8
+stance_decision_timer = 0.2
+positioning_timer_min = 1.0
+positioning_timer_max = 2.0
+retreat_timer = 1.2
+aggression_level = 1.2
+can_react = false
+reaction_chance = 0.5
+reaction_time = 1.0
+sprite_texture_path = "res://assets/test_sprites/paper_enemy.png"
+sprite_scale = Vector2(0.19, 0.19)
+color_tint = Color(0.4, 0.7, 1, 1)
+body_collision_size = Vector2(24, 19)
+attack_radius = 22.0
+attack_collision_scale = Vector2(0.9, 0.9)

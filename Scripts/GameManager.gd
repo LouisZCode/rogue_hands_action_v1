@@ -8,13 +8,17 @@ class_name GameManager
 @onready var defense_point_3: Label = $"../UILayer/HealthUI/PlayerDefensePoints/DefensePoint3"
 @onready var player_hearts_container: HBoxContainer = $"../UILayer/HealthUI/PlayerHearts"
 @onready var player: Player = $"../GameLayer/Player"
-@onready var enemy: Enemy = $"../GameLayer/Enemy"
+var enemy: Enemy = null  # Will be spawned from resources
 
 # Heart management
 var heart_labels: Array[Label] = []
 
 # Game state
 var score: int = 0
+
+# Enemy spawning system
+var input_buffer: String = ""
+var enemy_types_list: Array[String] = []
 
 func _ready():
 	# Check if another GameManager already exists
@@ -51,8 +55,15 @@ func _ready():
 	# Initialize hearts based on player's max health
 	initialize_hearts(player.max_health if player else 5)
 	
-	# Enemy now loads from resource automatically
-	print("Basic enemy should load from SimpleBaseEnemy.tres resource")
+	# Spawn first enemy from resource system
+	spawn_enemy_by_resource("BasicEnemy")
+	
+	# Initialize enemy database manager
+	var db_manager = EnemyDatabaseManager.new()
+	add_child(db_manager)
+	
+	# Initialize enemy spawning system
+	initialize_enemy_spawning_system()
 
 func _on_player_health_changed(new_health: int):
 	update_hearts_display(new_health)
@@ -61,7 +72,8 @@ func _on_player_stance_changed(new_stance: Player.Stance):
 	update_stance_ui(new_stance)
 
 func _on_player_attack(attacker_stance: Player.Stance, attack_position: Vector2):
-	print("Player attacks with: ", Player.Stance.keys()[attacker_stance])
+	# print("Player attacks with: ", Player.Stance.keys()[attacker_stance])
+	pass
 
 func _on_player_attack_cooldown_changed(current_cooldown: float, max_cooldown: float):
 	update_attack_cooldown_ui(current_cooldown, max_cooldown)
@@ -152,17 +164,44 @@ func update_hearts_display(current_health: int):
 				heart_labels[i].visible = true
 
 func spawn_new_enemy():
-	# Simple enemy respawning after death
+	# Spawn random enemy archetype after death for variety
 	var spawn_positions = [
 		Vector2(-300, -200), Vector2(300, 200),
 		Vector2(-300, 200), Vector2(300, -200)
 	]
 	var spawn_pos = spawn_positions[randi() % spawn_positions.size()]
 	
-	# Create simple enemy from scene
+	# Spawn random enemy archetype
+	var new_enemy = spawn_random_enemy_archetype(spawn_pos)
+	if new_enemy:
+		print("Spawned new random enemy at: ", spawn_pos)
+	else:
+		print("ERROR: Failed to spawn new enemy")
+
+func spawn_enemy_by_resource(resource_name: String, spawn_position: Vector2 = Vector2.ZERO):
+	"""Spawn an enemy from a .tres resource file"""
+	var resource_path = "res://Resources/Enemies/" + resource_name + ".tres"
+	var enemy_data = load(resource_path) as EnemyData
+	
+	if not enemy_data:
+		print("ERROR: Failed to load enemy resource: ", resource_path)
+		return null
+	
+	# Create enemy from scene
 	var enemy_scene = preload("res://scenes/Enemy.tscn")
-	var new_enemy = enemy_scene.instantiate()
-	new_enemy.global_position = spawn_pos
+	var new_enemy = enemy_scene.instantiate() as Enemy
+	
+	if not new_enemy:
+		print("ERROR: Failed to instantiate enemy scene")
+		return null
+	
+	# Set position (use center of screen if no position specified)
+	if spawn_position == Vector2.ZERO:
+		spawn_position = Vector2(200, -150)  # Default enemy position
+	new_enemy.global_position = spawn_position
+	
+	# Apply enemy data before adding to scene tree
+	new_enemy.enemy_data = enemy_data
 	
 	# Add to game layer
 	$"../GameLayer".add_child(new_enemy)
@@ -174,9 +213,124 @@ func spawn_new_enemy():
 	
 	# Update enemy reference
 	enemy = new_enemy
-	print("Spawned new basic enemy at: ", spawn_pos)
+	
+	print("Spawned enemy: ", enemy_data.enemy_name, " from resource: ", resource_name)
+	return new_enemy
+
+
+func refresh_enemy_resources():
+	"""Refresh available enemy types after CSV import"""
+	print("🔄 Refreshing enemy resource cache...")
+	# Update available enemy types for random spawning
+	var updated_types = get_available_enemy_types()
+	print("📋 Available enemy types: ", updated_types)
+
+func get_available_enemy_types() -> Array[String]:
+	"""Get list of all available enemy resource names"""
+	var enemy_types: Array[String] = []
+	var dir = DirAccess.open("res://Resources/Enemies/")
+	
+	if dir:
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		
+		while file_name != "":
+			if file_name.ends_with(".tres"):
+				# Remove .tres extension to get resource name
+				var resource_name = file_name.get_basename()
+				enemy_types.append(resource_name)
+			file_name = dir.get_next()
+	
+	return enemy_types
+
+func spawn_random_enemy_archetype(spawn_position: Vector2 = Vector2.ZERO):
+	"""Spawn a random enemy archetype for testing - now uses dynamic enemy list"""
+	var enemy_types = get_available_enemy_types()
+	
+	if enemy_types.size() == 0:
+		print("ERROR: No enemy resources found in res://Resources/Enemies/")
+		return null
+	
+	var random_type = enemy_types[randi() % enemy_types.size()]
+	return spawn_enemy_by_resource(random_type, spawn_position)
 
 func game_over():
 	print("Game Over! Final Score: ", score)
 	# Handle game over (show menu, restart, etc.)
 	get_tree().reload_current_scene()
+
+# === ENEMY SPAWNING SYSTEM ===
+
+func _input(event):
+	# Handle number + enter enemy spawning
+	if event is InputEventKey and event.pressed:
+		handle_enemy_spawn_input(event)
+
+func initialize_enemy_spawning_system():
+	"""Initialize the enemy spawning system and show instructions"""
+	enemy_types_list = get_available_enemy_types()
+	
+	print("\n" + "=".repeat(50))
+	print("🎮 ENEMY SPAWNING SYSTEM READY")
+	print("=".repeat(50))
+	print("Type enemy number + [ENTER] to spawn:")
+	print("")
+	
+	for i in range(enemy_types_list.size()):
+		var enemy_name = enemy_types_list[i].replace("Enemy", "")
+		print("  %d. %s" % [i + 1, enemy_name])
+	
+	print("")
+	print("Example: Type '3' then [ENTER] to spawn enemy #3")
+	print("Clear existing enemy before spawning new one")
+	print("=".repeat(50) + "\n")
+
+func handle_enemy_spawn_input(event: InputEventKey):
+	"""Handle number and enter key inputs for enemy spawning"""
+	var key_code = event.keycode
+	
+	# Handle number keys (0-9)
+	if key_code >= KEY_0 and key_code <= KEY_9:
+		var digit = str(key_code - KEY_0)
+		input_buffer += digit
+		print("Input: " + input_buffer)
+	
+	# Handle Enter key
+	elif key_code == KEY_ENTER:
+		if input_buffer.length() > 0:
+			spawn_enemy_by_number(int(input_buffer))
+			input_buffer = ""  # Clear buffer
+		else:
+			print("❌ Enter a number first, then press Enter")
+	
+	# Handle Backspace (optional - clear buffer)
+	elif key_code == KEY_BACKSPACE:
+		if input_buffer.length() > 0:
+			input_buffer = input_buffer.substr(0, input_buffer.length() - 1)
+			print("Input: " + input_buffer if input_buffer.length() > 0 else "Input cleared")
+
+func spawn_enemy_by_number(enemy_number: int):
+	"""Spawn an enemy by its number in the list"""
+	if enemy_number < 1 or enemy_number > enemy_types_list.size():
+		print("❌ Invalid enemy number! Valid range: 1-%d" % enemy_types_list.size())
+		return
+	
+	# Remove existing enemy first
+	clear_current_enemy()
+	
+	# Spawn the selected enemy
+	var enemy_type = enemy_types_list[enemy_number - 1]
+	var spawn_position = Vector2(200, -150)  # Default spawn position
+	
+	var new_enemy = spawn_enemy_by_resource(enemy_type, spawn_position)
+	if new_enemy:
+		var display_name = enemy_type.replace("Enemy", "")
+		print("✅ Spawned Enemy #%d: %s" % [enemy_number, display_name])
+	else:
+		print("❌ Failed to spawn enemy #%d" % enemy_number)
+
+func clear_current_enemy():
+	"""Remove the current enemy from the scene"""
+	if enemy and is_instance_valid(enemy):
+		enemy.queue_free()
+		enemy = null

@@ -21,6 +21,8 @@ extends Resource
 @export_group("Detection")
 enum DetectionType { VISION, AUTOMATIC, PROXIMITY }
 @export var detection_type: DetectionType = DetectionType.VISION
+@export var instant_detection: bool = false  # Skip vision, detect immediately when player enters room
+@export var detection_radius: float = 500.0  # Range for instant detection (room-wide)
 @export var detection_range: float = 150.0
 @export var enhanced_detection_radius: float = 300.0
 @export var vision_angle: float = 60.0  # degrees (for vision-based detection)
@@ -57,6 +59,14 @@ enum DetectionType { VISION, AUTOMATIC, PROXIMITY }
 @export var can_react: bool = false  # Can counter-attack mid-combat
 @export var reaction_chance: float = 0.5  # Probability of reacting to player attacks
 @export var reaction_time: float = 1.0  # Time window for reaction
+@export var reflex: float = 0.0  # Future: Reflex speed modifier
+@export var weight: float = 1.0  # Future: Weight/mass for physics
+
+# === VISUAL SYSTEM ===
+@export_group("Visual")
+@export var sprite_texture_path: String = "res://assets/test_sprites/idle_enemy.png"
+@export var sprite_scale: Vector2 = Vector2(0.21, 0.21)
+@export var color_tint: Color = Color.WHITE
 
 # === COLLISION & SIZE ===
 @export_group("Collision")

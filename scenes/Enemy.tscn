@@ -1,11 +1,8 @@
-[gd_scene load_steps=7 format=3 uid="uid://d1e8j4xvn7m2p"]
+[gd_scene load_steps=6 format=3 uid="uid://d1e8j4xvn7m2p"]
 
 [ext_resource type="Script" uid="uid://djl7o4er2fb6w" path="res://Scripts/Enemy.gd" id="1_enemy_script"]
 [ext_resource type="Texture2D" uid="uid://bvb645moajooq" path="res://assets/test_sprites/idle_enemy.png" id="3_idle_sprite"]
 [ext_resource type="Script" uid="uid://cn548r8v37834" path="res://Scripts/DashPreview.gd" id="4_dash_preview_script"]
-
-[sub_resource type="Resource" id="Resource_mpr68"]
-metadata/__load_path__ = "res://resources/BaseEnemy.tres"
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(26, 21)
@@ -16,7 +13,6 @@ radius = 25.0
 [node name="Enemy" type="CharacterBody2D"]
 collision_layer = 2
 script = ExtResource("1_enemy_script")
-enemy_data = SubResource("Resource_mpr68")
 
 [node name="Sprite" type="Sprite2D" parent="."]
 z_index = 2

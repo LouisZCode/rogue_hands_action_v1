@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/EnemyData.gd" id="1_xip6f"]
+
+[resource]
+script = ExtResource("1_xip6f")
+enemy_name = "Stealth Paper Assassin"
+max_health = 4
+max_defense_points = 1
+speed = 120.0
+dash_speed = 450.0
+dash_duration = 0.3
+detection_type = 0
+instant_detection = false
+detection_radius = 400.0
+detection_range = 150.0
+enhanced_detection_radius = 300.0
+vision_angle = 180.0
+vision_range = 300.0
+vision_collision_mask = 2
+attack_cooldown = 0.7
+attack_range = 70.0
+damage_multiplier = 1.5
+stun_duration = 3.0
+neutral_probability = 5.0
+rock_probability = 10.0
+paper_probability = 70.0
+scissors_probability = 15.0
+stance_to_dash_delay = 0.5
+stance_decision_timer = 0.1
+positioning_timer_min = 1.0
+positioning_timer_max = 2.0
+retreat_timer = 0.3
+aggression_level = 2.0
+can_react = true
+reaction_chance = 0.95
+reaction_time = 0.4
+sprite_texture_path = "res://assets/test_sprites/paper_enemy.png"
+sprite_scale = Vector2(0.18, 0.18)
+color_tint = Color(0.2, 0.2, 0.8, 0.8)
+body_collision_size = Vector2(22, 18)
+attack_radius = 18.0
+attack_collision_scale = Vector2(0.8, 0.8)

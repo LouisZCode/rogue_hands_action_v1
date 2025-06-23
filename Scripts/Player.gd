@@ -568,12 +568,13 @@ func handle_stance_direction_change(old_stance: Stance, new_stance: Stance):
 		else:
 			# Use last known movement direction when idle
 			entering_stance_direction = last_movement_direction
-		print("PLAYER: Entering stance ", Stance.keys()[new_stance], " - Position: ", global_position, " - Direction: ", entering_stance_direction)
+		# print("PLAYER: Entering stance ", Stance.keys()[new_stance], " - Position: ", global_position, " - Direction: ", entering_stance_direction)
 	
 	# Exiting stance back to neutral - restore preserved direction
 	elif old_stance != Stance.NEUTRAL and new_stance == Stance.NEUTRAL:
 		# Don't immediately restore here - let update_stance_visual handle it
-		print("PLAYER: Exiting stance - Position: ", global_position, " - Restored direction: ", entering_stance_direction)
+		# print("PLAYER: Exiting stance - Position: ", global_position, " - Restored direction: ", entering_stance_direction)
+		pass
 
 func update_stance_visual():
 	# Update animation and scale based on stance
