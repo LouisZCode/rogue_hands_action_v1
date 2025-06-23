@@ -12,7 +12,8 @@
       "WebFetch(domain:forum.godotengine.org)",
       "Bash(afplay:*)",
       "Bash(powershell.exe:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

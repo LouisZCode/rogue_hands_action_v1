@@ -25,6 +25,7 @@ enum DetectionType { VISION, AUTOMATIC, PROXIMITY }
 @export var enhanced_detection_radius: float = 300.0
 @export var vision_angle: float = 60.0  # degrees (for vision-based detection)
 @export var vision_range: float = 200.0  # pixels (for vision-based detection)
+@export var vision_collision_mask: int = 2  # Which layers block vision (walls/obstacles)
 
 # === COMBAT BEHAVIOR ===
 @export_group("Combat")

@@ -86,7 +86,7 @@ var players_hit_this_dash: Array[Node] = []
 @onready var stun_indicator: Label = $StunIndicator
 @onready var lost_indicator: Label = $LostIndicator
 @onready var alert_indicator: Label = $AlertIndicator
-@onready var detection_area: Area2D = $DetectionArea
+@onready var vision_cast: RayCast2D = $VisionCast
 @onready var attack_area: Area2D = $AttackArea
 @onready var audio_player: AudioStreamPlayer2D = $AudioPlayer
 @onready var attack_timer_bar: ProgressBar = $AttackTimerBar
@@ -101,6 +101,12 @@ var debug_attack_range: bool = true  # Show attack collision area
 var base_detection_radius: float = 150.0  # Normal detection range
 var enhanced_detection_radius: float = 300.0  # When player is spotted (double size)
 var current_detection_radius: float = 150.0  # Current radius for drawing
+
+# Vision system
+var facing_direction: Vector2 = Vector2(1, 0)  # Default facing right
+var last_player_position: Vector2 = Vector2.ZERO
+var vision_timer: float = 0.0
+var vision_check_interval: float = 0.1  # Check vision 10 times per second
 
 # Stance colors and symbols (enemy uses all stances tactically)
 var stance_colors = {
@@ -158,18 +164,6 @@ func apply_collision_settings():
 		circle_shape.radius = enemy_data.attack_radius
 		attack_collision.scale = enemy_data.attack_collision_scale
 
-func set_enemy_data(data: EnemyData):
-	"""Set enemy data from factory - called before adding to scene tree"""
-	if not data:
-		print("ERROR: Cannot set null enemy data")
-		return
-	
-	enemy_data = data
-	
-	# Immediately apply the data if the enemy is already in the scene tree
-	if is_inside_tree():
-		apply_enemy_data()
-	# Otherwise, it will be applied in _ready()
 
 func apply_enemy_data():
 	"""Apply enemy data to all relevant systems"""
@@ -209,48 +203,32 @@ func apply_enemy_data():
 	
 	print("Applied enemy data: ", enemy_data.enemy_name, " (", enemy_data.get_archetype_description(), ")")
 
-func check_and_reload_enemy_data():
-	"""Check if enemy_data is now available after deferred loading"""
-	print("DEBUG: Deferred check - enemy_data: ", enemy_data)
-	print("DEBUG: Is EnemyData type: ", enemy_data is EnemyData)
-	
-	if enemy_data and enemy_data is EnemyData:
-		print("Found valid EnemyData resource on deferred check: ", enemy_data.enemy_name)
-		# Only apply if we're currently using default data
-		if max_health == 5 and current_stance == Stance.NEUTRAL:  # Default values
-			apply_enemy_data()
-			print("Applied deferred enemy data successfully!")
-		else:
-			print("Enemy already has custom data, skipping deferred application")
-	else:
-		print("Still no valid EnemyData found on deferred check")
 
 func _ready():
 	# Initialize audio manager
 	audio_manager = AudioManager.new()
 	
-	# Load enemy data from resource (only if not already loaded by factory)
-	print("DEBUG: enemy_data at _ready: ", enemy_data)
-	print("DEBUG: enemy_data type: ", typeof(enemy_data))
-	
-	if not enemy_data:
+	# Load enemy data from resource
+	if enemy_data:
+		print("Enemy_data found: ", enemy_data.enemy_name)
+		apply_enemy_data()
+	else:
 		print("No enemy_data found, loading defaults...")
 		load_enemy_data()
-	else:
-		print("Enemy_data found: ", enemy_data.enemy_name if enemy_data else "null")
-		# Apply enemy data if it was set by factory
-		apply_enemy_data()
-	
-	# Also try deferred loading as backup
-	call_deferred("check_and_reload_enemy_data")
 	
 	# Initialize dash preview for enemy
 	if dash_preview:
 		dash_preview.set_enemy_style()
 	
 	update_visual()
-	detection_area.body_entered.connect(_on_detection_area_body_entered)
-	detection_area.body_exited.connect(_on_detection_area_body_exited)
+	# Setup vision casting (no signal connections needed for raycasting)
+	if vision_cast:
+		vision_cast.collision_mask = enemy_data.vision_collision_mask if enemy_data else 2
+		vision_cast.enabled = true
+	
+	# Get player reference for vision system
+	if not player_ref:
+		player_ref = get_tree().get_first_node_in_group("player")
 	attack_area.body_entered.connect(_on_attack_area_body_entered)
 	# Emit initial defense points
 	enemy_defense_points_changed.emit(current_defense_points, max_defense_points)
@@ -292,6 +270,12 @@ func _physics_process(delta):
 	# DEBUG: Show dash state
 	if is_dashing:
 		print("DEBUG _physics_process: Enemy is dashing - position: ", global_position, " dash_timer: ", dash_timer)
+	
+	# Update vision detection system
+	vision_timer += delta
+	if vision_timer >= vision_check_interval:
+		vision_timer = 0.0
+		update_vision_detection()
 	
 	update_ai(delta)
 	update_timers(delta)
@@ -477,11 +461,16 @@ func handle_walking_movement():
 	
 	# Move in the current walking direction
 	velocity = walking_direction * walking_speed
+	# Update facing direction based on movement
+	if walking_direction.length() > 0.1:
+		facing_direction = walking_direction.normalized()
 
 func pick_new_walking_direction():
 	# Pick a random direction
 	var angle = randf() * 2 * PI
 	walking_direction = Vector2(cos(angle), sin(angle))
+	# Update facing direction immediately
+	facing_direction = walking_direction.normalized()
 	
 	# Make sure we're not walking directly into a wall
 	var test_position = global_position + walking_direction * 100
@@ -764,11 +753,6 @@ func attack_during_dash():
 			# Handle enemy stun (parry success!)
 			if combat_result.enemy_stunned:
 				apply_stun()
-				# Create parry particle effect at enemy position
-				var game_manager = get_tree().get_first_node_in_group("game_manager")
-				if game_manager and game_manager.particle_manager:
-					# game_manager.particle_manager.create_parry_effect(global_position)  # Disabled for cleaner combat
-					pass
 			
 			# Add player to the list of already hit players
 			players_hit_this_dash.append(body)
@@ -903,11 +887,6 @@ func take_damage_from_player(player_stance, attack_position: Vector2, is_mutual_
 	if player_stunned:
 		if player_ref and player_ref.has_method("apply_stun"):
 			player_ref.apply_stun()
-			# Create parry particle effect at player position
-			var game_manager = get_tree().get_first_node_in_group("game_manager")
-			if game_manager and game_manager.particle_manager:
-				# game_manager.particle_manager.create_parry_effect(player_ref.global_position)  # Disabled for cleaner combat
-				pass
 	
 	print("Combat: Player ", Player.Stance.keys()[player_stance], " vs Enemy ", Stance.keys()[current_stance], " - Damage: ", damage, " - ", result)
 
@@ -1256,87 +1235,129 @@ func fix_attack_area_size():
 func enhance_detection_range():
 	# Double the detection range when player is spotted
 	current_detection_radius = enhanced_detection_radius
-	# Scale up the actual collision area (base is 25px * 12x = 300px radius)
-	var detection_collision = detection_area.get_child(0) as CollisionShape2D
-	if detection_collision:
-		detection_collision.scale = Vector2(12, 12)  # 25px base * 12x = 300px radius
+	# Vision system will use enhanced range automatically
 	queue_redraw()
 	print("Enemy enhanced detection - harder to escape!")
 
 func reset_detection_range():
 	# Return to normal detection range
 	current_detection_radius = base_detection_radius
-	# Scale back the collision area (base is 25px * 6x = 150px radius)
-	var detection_collision = detection_area.get_child(0) as CollisionShape2D
-	if detection_collision:
-		detection_collision.scale = Vector2(6, 6)  # 25px base * 6x = 150px radius
+	# Vision system will use normal range automatically
 	queue_redraw()
 
-func _on_detection_area_body_entered(body):
-	if body is Player:
-		player_ref = body
+func can_see_player() -> bool:
+	"""Vision-based detection using raycasting and field of view"""
+	# Get player reference if we don't have one
+	if not player_ref:
+		player_ref = get_tree().get_first_node_in_group("player")
+		if not player_ref:
+			return false
+	
+	var to_player = player_ref.global_position - global_position
+	var distance = to_player.length()
+	
+	# Check if player is within vision range (use enhanced range when applicable)
+	var base_vision_range = enemy_data.vision_range if enemy_data else 200.0
+	var effective_vision_range = base_vision_range
+	
+	# Use enhanced range if detection is currently enhanced
+	if current_detection_radius > base_detection_radius:
+		var enhancement_ratio = current_detection_radius / base_detection_radius
+		effective_vision_range = base_vision_range * enhancement_ratio
+	
+	if distance > effective_vision_range:
+		return false
+	
+	# Check if player is within field of view
+	var vision_angle = enemy_data.vision_angle if enemy_data else 60.0
+	var angle_to_player = facing_direction.angle_to(to_player.normalized())
+	var half_fov = deg_to_rad(vision_angle / 2.0)
+	
+	if abs(angle_to_player) > half_fov:
+		return false
+	
+	# Check line of sight with raycasting
+	if vision_cast:
+		vision_cast.target_position = to_player
+		vision_cast.force_raycast_update()
 		
-		# Hide any active indicators when player is detected again
-		if lost_indicator:
-			lost_indicator.visible = false
-		if alert_indicator and not is_alerting:
-			alert_indicator.visible = false
-		
-		# Check if we were in patrol states (trigger alert)
-		var was_patrolling = current_state in [AIState.WALKING, AIState.IDLE]
-		
-		if was_patrolling:
-			# Show alert first
-			current_state = AIState.ALERT
-			is_alerting = true
-			alert_timer = alert_duration
-			if alert_indicator:
-				alert_indicator.visible = true
-			# Enhance detection range when player is spotted
-			enhance_detection_range()
-			# Play alert sound
-			# if audio_manager and audio_player:
-			#	audio_manager.play_enemy_alert_sfx(audio_player)
-			print("Enemy spotted player - ALERT!")
-		else:
-			# Was already in some other state, go directly to observing
-			current_state = AIState.OBSERVING
-			positioning_timer = randf_range(0.5, 1.0)
-			# Enhance detection range when player is spotted
-			enhance_detection_range()
-			print("Enemy detected player - entering tactical mode")
+		if vision_cast.is_colliding():
+			var collider = vision_cast.get_collider()
+			# If we hit something other than the player, vision is blocked
+			if collider != player_ref:
+				return false
+	
+	return true
 
-func _on_detection_area_body_exited(body):
-	if body is Player:
-		# Don't interrupt if enemy is in attacking state (committed to attack)
-		if current_state != AIState.ATTACKING:
-			player_ref = null
-			
-			# Reset detection range when player escapes
-			reset_detection_range()
-			
-			# Check if we were in combat states (not just walking around)
-			var was_in_combat = current_state in [AIState.ALERT, AIState.OBSERVING, AIState.POSITIONING, AIState.STANCE_SELECTION, AIState.RETREATING]
-			
-			if was_in_combat:
-				# Show confusion before returning to patrol
-				current_state = AIState.LOST_PLAYER
-				lost_player_timer = lost_player_duration
-				if lost_indicator:
-					lost_indicator.visible = true
-				# Play lost player sound
-				# if audio_manager and audio_player:
-				#	audio_manager.play_enemy_lost_player_sfx(audio_player)
-				print("DEBUG: Enemy confused - lost player during combat, timer set to: ", lost_player_timer)
-			else:
-				# Was just walking, return to walking immediately
-				current_state = AIState.WALKING
-				pick_new_walking_direction()
-				walking_timer = direction_change_interval
-				print("Enemy lost player - returning to walking")
-			
-			current_stance = Stance.NEUTRAL
-			update_visual()
+func update_vision_detection():
+	"""Update vision-based player detection"""
+	var player_visible = can_see_player()
+	
+	if player_visible:
+		# Player is visible - enter detection state
+		if not player_ref:
+			player_ref = get_tree().get_first_node_in_group("player")
+		
+		if player_ref:
+			# Handle detection logic (similar to old body_entered)
+			_handle_player_detected()
+	else:
+		# Player not visible - handle loss of sight
+		if player_ref:
+			_handle_player_lost()
+
+func _handle_player_detected():
+	"""Handle when player is detected via vision"""
+	# Hide any active indicators when player is detected again
+	if lost_indicator:
+		lost_indicator.visible = false
+	if alert_indicator and not is_alerting:
+		alert_indicator.visible = false
+	
+	# Check if we were in patrol states (trigger alert)
+	var was_patrolling = current_state in [AIState.WALKING, AIState.IDLE]
+	
+	if was_patrolling:
+		# Show alert first
+		current_state = AIState.ALERT
+		is_alerting = true
+		alert_timer = alert_duration
+		if alert_indicator:
+			alert_indicator.visible = true
+		# Enhance detection range when player is spotted
+		enhance_detection_range()
+		print("Enemy spotted player - ALERT!")
+	else:
+		# Was already in some other state, go directly to observing
+		current_state = AIState.OBSERVING
+		positioning_timer = randf_range(0.5, 1.0)
+		# Enhance detection range when player is spotted
+		enhance_detection_range()
+		print("Enemy detected player - entering tactical mode")
+
+func _handle_player_lost():
+	"""Handle when player is lost from vision"""
+	# Don't interrupt if enemy is in attacking state (committed to attack)
+	if current_state != AIState.ATTACKING:
+		player_ref = null
+		
+		# Reset detection range when player escapes
+		reset_detection_range()
+		
+		# Check if we were in combat states (not just walking around)
+		var was_in_combat = current_state in [AIState.ALERT, AIState.OBSERVING, AIState.POSITIONING, AIState.STANCE_SELECTION, AIState.RETREATING]
+		
+		if was_in_combat:
+			# Show confused/lost state
+			current_state = AIState.LOST_PLAYER
+			lost_player_timer = lost_player_duration
+			if lost_indicator:
+				lost_indicator.visible = true
+			print("Enemy lost sight of player")
+		else:
+			# Was just walking around, return to normal patrol
+			current_state = AIState.WALKING
+			print("Enemy lost sight of player (returning to patrol)")
 
 func update_enemy_dash_preview():
 	# Show simple trajectory line from enemy position to target when attacking
