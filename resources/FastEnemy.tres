@@ -1,0 +1,37 @@
+[gd_resource type="EnemyData" script_class="EnemyData" load_steps=2 format=3 uid="uid://b8n4t1m2k5r7w"]
+
+[ext_resource type="Script" uid="uid://c0c2gso3oggwc" path="res://Scripts/EnemyData.gd" id="1_enemy_data"]
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Swift Assassin"
+max_health = 3
+max_defense_points = 0
+speed = 160.0
+dash_speed = 450.0
+dash_duration = 0.3
+detection_type = 0
+detection_range = 120.0
+enhanced_detection_radius = 280.0
+vision_angle = 45.0
+vision_range = 160.0
+attack_cooldown = 0.8
+attack_range = 80.0
+damage_multiplier = 1.1
+stun_duration = 2.5
+neutral_probability = 5.0
+rock_probability = 30.0
+paper_probability = 25.0
+scissors_probability = 40.0
+stance_to_dash_delay = 0.4
+stance_decision_timer = 0.15
+positioning_timer_min = 0.2
+positioning_timer_max = 0.6
+retreat_timer = 0.4
+aggression_level = 1.8
+can_react = false
+reaction_chance = 0.2
+reaction_time = 0.6
+body_collision_size = Vector2(22, 18)
+attack_radius = 22.0
+attack_collision_scale = Vector2(1, 1)

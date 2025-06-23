@@ -1,12 +1,16 @@
 extends CharacterBody2D
 class_name Enemy
 
-# AI and movement variables
-@export var speed: float = 100.0
-@export var detection_range: float = 150.0
-@export var attack_range: float = 100.0  # Doubled for increased tactical space
-@export var dash_speed: float = 300.0  # Half of player dash speed
-@export var dash_duration: float = 0.6  # Doubled for increased dash distance
+# === ENEMY DATA RESOURCE ===
+@export var enemy_data: EnemyData
+var default_data: EnemyData  # Fallback if no resource assigned
+
+# AI and movement variables (loaded from resource)
+var speed: float = 100.0
+var detection_range: float = 150.0
+var attack_range: float = 100.0
+var dash_speed: float = 300.0
+var dash_duration: float = 0.6
 
 # Debug/Testing variables
 @export var debug_rock_only: bool = true  # For combat testing - enemy only uses Rock
@@ -117,9 +121,128 @@ signal enemy_died
 signal enemy_attack(attacker_stance: Stance, attack_position: Vector2)
 signal enemy_defense_points_changed(current_defense: int, max_defense: int)
 
+func load_enemy_data():
+	"""Load variables from EnemyData resource or create default values"""
+	
+	# Create default data if no resource assigned
+	if not enemy_data:
+		print("Warning: No EnemyData resource assigned to ", name, ". Using default values.")
+		enemy_data = create_default_enemy_data()
+	
+	# Validate the data
+	if not enemy_data.validate_data():
+		print("Warning: Invalid data in EnemyData resource. Some values may be incorrect.")
+	
+	# Apply the loaded data
+	apply_enemy_data()
+
+func create_default_enemy_data() -> EnemyData:
+	"""Create default EnemyData if none assigned"""
+	var data = EnemyData.new()
+	data.enemy_name = "Default Enemy"
+	# All other values will use the defaults from EnemyData.gd
+	return data
+
+func apply_collision_settings():
+	"""Apply collision settings from enemy data to the actual collision shapes"""
+	# Apply body collision size
+	var body_collision = get_node("CollisionShape2D")
+	if body_collision and body_collision.shape is RectangleShape2D:
+		var rect_shape = body_collision.shape as RectangleShape2D
+		rect_shape.size = enemy_data.body_collision_size
+	
+	# Apply attack collision settings
+	var attack_collision = attack_area.get_child(0) as CollisionShape2D
+	if attack_collision and attack_collision.shape is CircleShape2D:
+		var circle_shape = attack_collision.shape as CircleShape2D
+		circle_shape.radius = enemy_data.attack_radius
+		attack_collision.scale = enemy_data.attack_collision_scale
+
+func set_enemy_data(data: EnemyData):
+	"""Set enemy data from factory - called before adding to scene tree"""
+	if not data:
+		print("ERROR: Cannot set null enemy data")
+		return
+	
+	enemy_data = data
+	
+	# Immediately apply the data if the enemy is already in the scene tree
+	if is_inside_tree():
+		apply_enemy_data()
+	# Otherwise, it will be applied in _ready()
+
+func apply_enemy_data():
+	"""Apply enemy data to all relevant systems"""
+	if not enemy_data:
+		return
+	
+	# Load basic stats
+	max_health = enemy_data.max_health
+	current_health = max_health
+	max_defense_points = enemy_data.max_defense_points
+	current_defense_points = max_defense_points
+	
+	# Load movement variables
+	speed = enemy_data.speed
+	dash_speed = enemy_data.dash_speed
+	dash_duration = enemy_data.dash_duration
+	
+	# Load detection variables
+	detection_range = enemy_data.detection_range
+	enhanced_detection_radius = enemy_data.enhanced_detection_radius
+	
+	# Load combat variables
+	attack_cooldown = enemy_data.attack_cooldown
+	attack_range = enemy_data.attack_range
+	stun_duration = enemy_data.stun_duration
+	
+	# Load AI timing variables
+	stance_to_dash_delay = enemy_data.get_aggression_modified_timer(enemy_data.stance_to_dash_delay)
+	stance_decision_timer = enemy_data.get_aggression_modified_timer(enemy_data.stance_decision_timer)
+	retreat_timer = enemy_data.get_aggression_modified_timer(enemy_data.retreat_timer)
+	
+	# Apply collision settings
+	apply_collision_settings()
+	
+	# Emit defense points changed signal
+	enemy_defense_points_changed.emit(current_defense_points, max_defense_points)
+	
+	print("Applied enemy data: ", enemy_data.enemy_name, " (", enemy_data.get_archetype_description(), ")")
+
+func check_and_reload_enemy_data():
+	"""Check if enemy_data is now available after deferred loading"""
+	print("DEBUG: Deferred check - enemy_data: ", enemy_data)
+	print("DEBUG: Is EnemyData type: ", enemy_data is EnemyData)
+	
+	if enemy_data and enemy_data is EnemyData:
+		print("Found valid EnemyData resource on deferred check: ", enemy_data.enemy_name)
+		# Only apply if we're currently using default data
+		if max_health == 5 and current_stance == Stance.NEUTRAL:  # Default values
+			apply_enemy_data()
+			print("Applied deferred enemy data successfully!")
+		else:
+			print("Enemy already has custom data, skipping deferred application")
+	else:
+		print("Still no valid EnemyData found on deferred check")
+
 func _ready():
 	# Initialize audio manager
 	audio_manager = AudioManager.new()
+	
+	# Load enemy data from resource (only if not already loaded by factory)
+	print("DEBUG: enemy_data at _ready: ", enemy_data)
+	print("DEBUG: enemy_data type: ", typeof(enemy_data))
+	
+	if not enemy_data:
+		print("No enemy_data found, loading defaults...")
+		load_enemy_data()
+	else:
+		print("Enemy_data found: ", enemy_data.enemy_name if enemy_data else "null")
+		# Apply enemy data if it was set by factory
+		apply_enemy_data()
+	
+	# Also try deferred loading as backup
+	call_deferred("check_and_reload_enemy_data")
 	
 	# Initialize dash preview for enemy
 	if dash_preview:

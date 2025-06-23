@@ -5,8 +5,18 @@ class_name ParticleManager
 var hit_particles_scene = preload("res://scenes/HitParticles.tscn")
 var gesture_particles_scene = preload("res://scenes/GestureParticles.tscn")
 
+# Singleton tracking
+static var instance_count = 0
+
 func _ready():
-	print("ParticleManager initialized with particle scenes loaded")
+	instance_count += 1
+	if instance_count == 1:
+		print("ParticleManager initialized with particle scenes loaded")
+	else:
+		print("WARNING: Multiple ParticleManager instances! Count: ", instance_count)
+
+func _exit_tree():
+	instance_count -= 1
 
 func create_hit_effect(pos: Vector2):
 	var particles = hit_particles_scene.instantiate()

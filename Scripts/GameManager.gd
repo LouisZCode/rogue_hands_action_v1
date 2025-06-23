@@ -20,8 +20,58 @@ var particle_manager: ParticleManager
 var score: int = 0
 
 func _ready():
+	# Check if another GameManager already exists
+	var existing_managers = get_tree().get_nodes_in_group("game_manager")
+	if existing_managers.size() > 0:
+		print("WARNING: Multiple GameManagers detected! Current count: ", existing_managers.size() + 1)
+		for manager in existing_managers:
+			print("  Existing manager: ", manager.name, " at ", manager.get_path())
+	
 	# Add to game_manager group for easy access
 	add_to_group("game_manager")
+	
+	# Initialize particle manager only if we don't have one already
+	if not particle_manager:
+		particle_manager = ParticleManager.new()
+		add_child(particle_manager)
+		print("GameManager initialized with new ParticleManager")
+	else:
+		print("GameManager reusing existing ParticleManager")
+	
+	# Connect player signals
+	if player:
+		player.health_changed.connect(_on_player_health_changed)
+		player.stance_changed.connect(_on_player_stance_changed)
+		player.player_attack.connect(_on_player_attack)
+		player.attack_cooldown_changed.connect(_on_player_attack_cooldown_changed)
+		player.defense_points_changed.connect(_on_player_defense_points_changed)
+	
+	# Connect enemy signals  
+	if enemy:
+		enemy.enemy_died.connect(_on_enemy_died)
+		enemy.enemy_attack.connect(_on_enemy_attack)
+		enemy.enemy_defense_points_changed.connect(_on_enemy_defense_points_changed)
+	
+	# Initialize UI
+	update_stance_ui(player.current_stance if player else Player.Stance.ROCK)
+	update_attack_cooldown_ui(0.0, 1.0)  # Initialize cooldown bar
+	update_player_defense_points_ui(3, 3)  # Initialize defense points
+	# Initialize hearts based on player's max health
+	initialize_hearts(player.max_health if player else 5)
+
+func _input(event):
+	# Debug input handling for testing the enemy system
+	if event.is_action_pressed("ui_accept"):  # Enter key
+		print("Testing enemy factory...")
+		test_enemy_factory()
+	elif event.is_action_pressed("ui_select"):  # Spacebar
+		print("Testing random enemies...")
+		test_random_enemies()
+	elif event.is_action_pressed("ui_cancel"):  # Escape key
+		print("Clearing enemies...")
+		clear_all_enemies()
+	elif event.is_action_pressed("ui_home"):  # Home key
+		get_factory_stats()
 	
 	# Initialize particle manager
 	particle_manager = ParticleManager.new()
@@ -153,27 +203,103 @@ func update_hearts_display(current_health: int):
 				heart_labels[i].visible = true
 
 func spawn_new_enemy():
-	# Create new enemy at random position
-	var enemy_scene = preload("res://scenes/Enemy.tscn")
-	var new_enemy = enemy_scene.instantiate()
-	
-	# Random spawn position around the edges
+	# Use new EnemyFactory system for proper resource loading
 	var spawn_positions = [
 		Vector2(-300, -200), Vector2(300, 200),
 		Vector2(-300, 200), Vector2(300, -200)
 	]
-	new_enemy.global_position = spawn_positions[randi() % spawn_positions.size()]
+	var spawn_pos = spawn_positions[randi() % spawn_positions.size()]
 	
-	# Add to game layer
-	$"../GameLayer".add_child(new_enemy)
+	# Create enemy with random type using factory
+	var new_enemy = EnemyFactory.create_random_enemy(spawn_pos)
 	
-	# Connect signals
-	new_enemy.enemy_died.connect(_on_enemy_died)
-	new_enemy.enemy_attack.connect(_on_enemy_attack)
-	new_enemy.enemy_defense_points_changed.connect(_on_enemy_defense_points_changed)
+	if new_enemy:
+		# Add to game layer
+		$"../GameLayer".add_child(new_enemy)
+		
+		# Connect signals
+		new_enemy.enemy_died.connect(_on_enemy_died)
+		new_enemy.enemy_attack.connect(_on_enemy_attack)
+		new_enemy.enemy_defense_points_changed.connect(_on_enemy_defense_points_changed)
+		
+		print("Spawned new enemy using factory system: ", new_enemy.enemy_data.enemy_name)
+	else:
+		print("ERROR: Failed to spawn new enemy")
 	
 	# Update enemy reference
 	enemy = new_enemy
+
+# Debug and testing functions
+
+func test_enemy_factory():
+	"""Test the enemy factory by spawning all enemy types"""
+	print("=== TESTING ENEMY FACTORY ===")
+	
+	# Clear existing enemies first
+	clear_all_enemies()
+	
+	# Test spawning each enemy type
+	var enemy_types = EnemyFactory.get_available_enemy_types()
+	var spawn_positions = [
+		Vector2(-200, -100), Vector2(0, -100), Vector2(200, -100),
+		Vector2(-200, 100), Vector2(0, 100), Vector2(200, 100),
+		Vector2(-100, 0)
+	]
+	
+	for i in range(enemy_types.size()):
+		var enemy_type = enemy_types[i]
+		var spawn_pos = spawn_positions[i % spawn_positions.size()]
+		
+		var test_enemy = EnemyFactory.create_enemy_by_type(enemy_type, spawn_pos)
+		if test_enemy:
+			$"../GameLayer".add_child(test_enemy)
+			test_enemy.enemy_died.connect(_on_enemy_died)
+			test_enemy.enemy_attack.connect(_on_enemy_attack)
+			test_enemy.enemy_defense_points_changed.connect(_on_enemy_defense_points_changed)
+			print("Spawned test enemy: ", test_enemy.enemy_data.enemy_name, " at ", spawn_pos)
+		else:
+			print("ERROR: Failed to spawn ", enemy_type)
+	
+	print("Factory test complete - spawned ", enemy_types.size(), " different enemy types")
+
+func test_random_enemies():
+	"""Test random enemy spawning"""
+	print("=== TESTING RANDOM ENEMY SPAWNING ===")
+	
+	clear_all_enemies()
+	
+	# Spawn 5 random enemies
+	for i in range(5):
+		var angle = (i * 72.0) * PI / 180.0  # 72 degrees apart in circle
+		var radius = 150.0
+		var spawn_pos = Vector2(cos(angle), sin(angle)) * radius
+		
+		var random_enemy = EnemyFactory.create_random_enemy(spawn_pos)
+		if random_enemy:
+			$"../GameLayer".add_child(random_enemy)
+			random_enemy.enemy_died.connect(_on_enemy_died)
+			random_enemy.enemy_attack.connect(_on_enemy_attack)
+			random_enemy.enemy_defense_points_changed.connect(_on_enemy_defense_points_changed)
+		
+		# Small delay between spawns
+		await get_tree().create_timer(0.3).timeout
+	
+	print("Random enemy test complete")
+
+func clear_all_enemies():
+	"""Remove all enemies except the original one"""
+	var game_layer = $"../GameLayer"
+	for child in game_layer.get_children():
+		if child is Enemy and child != enemy:  # Keep original enemy
+			child.queue_free()
+	print("Cleared all test enemies")
+
+func get_factory_stats():
+	"""Print factory statistics"""
+	var stats = EnemyFactory.get_cache_stats()
+	print("=== FACTORY STATS ===")
+	print("Cached resources: ", stats.cached_resources)
+	print("Cache keys: ", stats.cache_keys)
 
 func game_over():
 	print("Game Over! Final Score: ", score)

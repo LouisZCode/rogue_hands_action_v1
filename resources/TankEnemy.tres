@@ -1,0 +1,37 @@
+[gd_resource type="EnemyData" script_class="EnemyData" load_steps=2 format=3 uid="uid://e8dd1sy0uve2"]
+
+[ext_resource type="Script" uid="uid://c0c2gso3oggwc" path="res://Scripts/EnemyData.gd" id="1_enemy_data"]
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Heavy Tank"
+max_health = 8
+max_defense_points = 3
+speed = 60.0
+dash_speed = 200.0
+dash_duration = 1.0
+detection_type = 2
+detection_range = 100.0
+enhanced_detection_radius = 200.0
+vision_angle = 30.0
+vision_range = 120.0
+attack_cooldown = 2.0
+attack_range = 70.0
+damage_multiplier = 1.5
+stun_duration = 4.0
+neutral_probability = 30.0
+rock_probability = 50.0
+paper_probability = 15.0
+scissors_probability = 5.0
+stance_to_dash_delay = 1.8
+stance_decision_timer = 0.8
+positioning_timer_min = 2.0
+positioning_timer_max = 4.0
+retreat_timer = 2.5
+aggression_level = 0.5
+can_react = true
+reaction_chance = 0.9
+reaction_time = 1.5
+body_collision_size = Vector2(32, 28)
+attack_radius = 30.0
+attack_collision_scale = Vector2(1, 1)
