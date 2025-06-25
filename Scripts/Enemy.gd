@@ -373,7 +373,10 @@ func update_ai(delta):
 				is_alerting = false
 				# Start observing player
 				current_state = AIState.OBSERVING
-				positioning_timer = randf_range(0.5, 1.0)
+				positioning_timer = randf_range(0.01, 0.05)  # Near-instant reaction
+				# Debug logging for Enemy 1
+				if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
+					print("AI STATE [%s]: ALERT → OBSERVING (timer: %.3f)" % [enemy_data.enemy_name, positioning_timer])
 			
 		AIState.OBSERVING:
 			# Stand still and observe player behavior
@@ -383,7 +386,10 @@ func update_ai(delta):
 			# After observing, decide on positioning
 			if positioning_timer <= 0:
 				current_state = AIState.POSITIONING
-				positioning_timer = randf_range(1.0, 2.0)
+				positioning_timer = randf_range(0.1, 0.3)  # Quick positioning
+				# Debug logging for Enemy 1
+				if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
+					print("AI STATE [%s]: OBSERVING → POSITIONING (timer: %.3f)" % [enemy_data.enemy_name, positioning_timer])
 			
 		AIState.POSITIONING:
 			# Move to tactical position while staying in neutral
@@ -395,6 +401,11 @@ func update_ai(delta):
 				if distance <= attack_range * 1.5 and attack_timer <= 0:
 					current_state = AIState.STANCE_SELECTION
 					stance_decision_timer = 0.3  # Time to decide stance
+					# Debug logging for Enemy 1
+					if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
+						print("AI STATE [%s]: POSITIONING → STANCE_SELECTION (distance: %.1f, attack_range: %.1f, attack_timer: %.1f)" % [enemy_data.enemy_name, distance, attack_range, attack_timer])
+				elif enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
+					print("AI STATE [%s]: POSITIONING waiting (distance: %.1f > %.1f OR attack_timer: %.1f > 0)" % [enemy_data.enemy_name, distance, attack_range * 1.5, attack_timer])
 			
 		AIState.STANCE_SELECTION:
 			# Stop moving and select counter-stance
@@ -404,6 +415,9 @@ func update_ai(delta):
 				# Start the 2-second delay before dash attack
 				stance_to_dash_timer = stance_to_dash_delay
 				current_state = AIState.ATTACKING
+				# Debug logging for Enemy 1
+				if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
+					print("AI STATE [%s]: STANCE_SELECTION → ATTACKING (stance: %s, dash_delay: %.1f)" % [enemy_data.enemy_name, Stance.keys()[current_stance], stance_to_dash_timer])
 			
 		AIState.ATTACKING:
 			# Show dash trajectory to target position
@@ -970,8 +984,8 @@ func take_damage(amount: int):
 		).set_delay(0.5)
 
 func update_timers(delta):
-	# Only update attack cooldown when in neutral stance (like player)
-	if attack_timer > 0 and current_stance == Stance.NEUTRAL:
+	# Update attack cooldown in all states for responsive combat
+	if attack_timer > 0:
 		attack_timer -= delta
 		
 	if stance_change_timer > 0:
@@ -1377,6 +1391,10 @@ func check_instant_detection():
 
 func _handle_player_detected():
 	"""Handle when player is detected via vision"""
+	# Debug logging for Enemy 1
+	if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
+		print("_HANDLE_PLAYER_DETECTED [%s]: Current state = %s, instant_detection = %s" % [enemy_data.enemy_name, AIState.keys()[current_state], enemy_data.instant_detection])
+	
 	# Hide any active indicators when player is detected again
 	if lost_indicator:
 		lost_indicator.visible = false
@@ -1391,15 +1409,23 @@ func _handle_player_detected():
 		current_state = AIState.ALERT
 		is_alerting = true
 		alert_timer = alert_duration
+		# Debug logging for Enemy 1
+		if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
+			print("AI STATE [%s]: %s → ALERT (alert_timer: %.1f)" % [enemy_data.enemy_name, "WALKING/IDLE", alert_timer])
+	else:
+		# Debug logging for Enemy 1 - why not patrolling?
+		if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
+			print("_HANDLE_PLAYER_DETECTED [%s]: NOT patrolling! Current state = %s, was_patrolling = %s" % [enemy_data.enemy_name, AIState.keys()[current_state], was_patrolling])
+		
+		# Force into combat mode even if not patrolling (fix for stuck enemies)
+		if current_state not in [AIState.ALERT, AIState.OBSERVING, AIState.POSITIONING, AIState.STANCE_SELECTION, AIState.ATTACKING]:
+			current_state = AIState.ALERT
+			is_alerting = true
+			alert_timer = alert_duration
+			if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
+				print("AI STATE [%s]: FORCED → ALERT (fixing stuck state)" % [enemy_data.enemy_name])
 		if alert_indicator:
 			alert_indicator.visible = true
-		# Enhance detection range when player is spotted
-		enhance_detection_range()
-		print("Enemy spotted player - ALERT!")
-	else:
-		# Was already in some other state, go directly to observing
-		current_state = AIState.OBSERVING
-		positioning_timer = randf_range(0.5, 1.0)
 		# Enhance detection range when player is spotted
 		enhance_detection_range()
 		print("Enemy detected player - entering tactical mode")
