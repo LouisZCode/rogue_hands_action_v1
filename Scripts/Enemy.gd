@@ -79,7 +79,7 @@ var stun_timer: float = 0.0
 var players_hit_this_dash: Array[Node] = []
 
 # References
-@onready var sprite: Sprite2D = $Sprite
+@onready var sprite: AnimatedSprite2D = $Sprite
 @onready var stance_label: Label = $StanceLabel
 @onready var health_bar: ProgressBar = $HealthBar
 @onready var defense_point_label: Label = $DefensePoint
@@ -165,32 +165,80 @@ func apply_collision_settings():
 		attack_collision.scale = enemy_data.attack_collision_scale
 
 func apply_visual_data():
-	"""Apply visual customization from enemy data"""
+	"""Apply visual customization from enemy data with animations"""
 	if not enemy_data:
 		return
 	
-	# Get sprite node
-	var sprite_node = get_node("Sprite") as Sprite2D
+	# Get animated sprite node
+	var sprite_node = get_node("Sprite") as AnimatedSprite2D
 	if not sprite_node:
-		print("ERROR: No Sprite node found for visual data application")
+		print("ERROR: No AnimatedSprite2D node found for visual data application")
 		return
 	
-	# Load texture from resource path
-	if enemy_data.sprite_texture_path != "":
-		var texture = load(enemy_data.sprite_texture_path) as Texture2D
-		if texture:
-			sprite_node.texture = texture
-			print("Loaded sprite texture: ", enemy_data.sprite_texture_path)
-		else:
-			print("WARNING: Failed to load sprite texture: ", enemy_data.sprite_texture_path)
+	# Create SpriteFrames resource with animations
+	setup_enemy_animations(sprite_node)
 	
 	# Apply scale
 	sprite_node.scale = enemy_data.sprite_scale
+	
+	# Start with idle animation
+	sprite_node.play("idle")
 	
 	# Apply color tint
 	sprite_node.modulate = enemy_data.color_tint
 	
 	print("Applied visual data - Scale: ", enemy_data.sprite_scale, " Tint: ", enemy_data.color_tint)
+
+func setup_enemy_animations(sprite_node: AnimatedSprite2D):
+	"""Create SpriteFrames resource with idle, walk, and walk_eye animations"""
+	var sprite_frames = SpriteFrames.new()
+	
+	# Load the three animation spritesheets
+	var idle_texture = preload("res://assets/assets_game/enemy_idle.png")
+	var walk_texture = preload("res://assets/assets_game/enemy_walk.png")
+	var walk_eye_texture = preload("res://assets/assets_game/enemy_walking_eye.png")
+	
+	# Add animations to SpriteFrames
+	add_spritesheet_frames(sprite_frames, "idle", idle_texture, 64, 64)
+	add_spritesheet_frames(sprite_frames, "walk", walk_texture, 64, 64)
+	add_spritesheet_frames(sprite_frames, "walk_eye", walk_eye_texture, 64, 64)
+	
+	# Apply the SpriteFrames to the AnimatedSprite2D
+	sprite_node.sprite_frames = sprite_frames
+	
+	print("Enemy animations setup complete: idle, walk, walk_eye")
+
+func add_spritesheet_frames(sprite_frames: SpriteFrames, animation_name: String, texture: Texture2D, frame_width: int, frame_height: int):
+	"""Extract frames from a spritesheet and add them to SpriteFrames"""
+	if not texture:
+		print("ERROR: No texture provided for animation: ", animation_name)
+		return
+	
+	# Create the animation
+	sprite_frames.add_animation(animation_name)
+	
+	# Calculate frames in the spritesheet
+	var texture_width = texture.get_width()
+	var texture_height = texture.get_height()
+	var frames_x = texture_width / frame_width
+	var frames_y = texture_height / frame_height
+	
+	# Extract each frame
+	for y in frames_y:
+		for x in frames_x:
+			# Create AtlasTexture for this frame
+			var atlas_texture = AtlasTexture.new()
+			atlas_texture.atlas = texture
+			atlas_texture.region = Rect2(x * frame_width, y * frame_height, frame_width, frame_height)
+			
+			# Add frame to animation
+			sprite_frames.add_frame(animation_name, atlas_texture)
+	
+	# Set animation properties
+	sprite_frames.set_animation_speed(animation_name, 8.0)  # 8 FPS
+	sprite_frames.set_animation_loop(animation_name, true)
+	
+	print("Added ", frames_x * frames_y, " frames for animation: ", animation_name)
 
 func apply_enemy_data():
 	"""Apply enemy data to all relevant systems"""
@@ -1048,16 +1096,21 @@ func update_timers(delta):
 		alert_timer -= delta
 
 func update_visual():
-	# Update sprite texture based on stance
-	match current_stance:
-		Stance.NEUTRAL:
-			sprite.texture = preload("res://assets/test_sprites/idle_enemy.png")
-		Stance.ROCK:
-			sprite.texture = preload("res://assets/test_sprites/rock_enemy.png")
-		Stance.PAPER:
-			sprite.texture = preload("res://assets/test_sprites/paper_enemy.png")
-		Stance.SCISSORS:
-			sprite.texture = preload("res://assets/test_sprites/scissor_enemy.png")
+	# Update animation based on AI state and movement
+	if sprite and sprite.sprite_frames:
+		match current_state:
+			AIState.IDLE, AIState.STUNNED, AIState.POSITIONING, AIState.STANCE_SELECTION:
+				if sprite.animation != "idle":
+					sprite.play("idle")
+			AIState.WALKING, AIState.LOST_PLAYER, AIState.RETREATING:
+				if sprite.animation != "walk":
+					sprite.play("walk")
+			AIState.ALERT, AIState.OBSERVING:
+				if sprite.animation != "walk_eye":
+					sprite.play("walk_eye")
+			AIState.ATTACKING:
+				# Keep current animation during attack
+				pass
 	
 	# stance_label.text = stance_symbols[current_stance]  # Disabled stance emoji display
 	update_health_bar()

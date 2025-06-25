@@ -65,7 +65,7 @@ enum DetectionType { VISION, AUTOMATIC, PROXIMITY }
 # === VISUAL SYSTEM ===
 @export_group("Visual")
 @export var sprite_texture_path: String = "res://assets/test_sprites/idle_enemy.png"
-@export var sprite_scale: Vector2 = Vector2(0.21, 0.21)
+@export var sprite_scale: Vector2 = Vector2(1.0, 1.0)
 @export var color_tint: Color = Color.WHITE
 
 # === COLLISION & SIZE ===

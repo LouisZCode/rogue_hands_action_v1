@@ -1,7 +1,6 @@
-[gd_scene load_steps=6 format=3 uid="uid://d1e8j4xvn7m2p"]
+[gd_scene load_steps=5 format=3 uid="uid://d1e8j4xvn7m2p"]
 
 [ext_resource type="Script" uid="uid://djl7o4er2fb6w" path="res://Scripts/Enemy.gd" id="1_enemy_script"]
-[ext_resource type="Texture2D" uid="uid://bvb645moajooq" path="res://assets/test_sprites/idle_enemy.png" id="3_idle_sprite"]
 [ext_resource type="Script" uid="uid://cn548r8v37834" path="res://Scripts/DashPreview.gd" id="4_dash_preview_script"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
@@ -14,10 +13,8 @@ radius = 25.0
 collision_layer = 2
 script = ExtResource("1_enemy_script")
 
-[node name="Sprite" type="Sprite2D" parent="."]
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
 z_index = 2
-scale = Vector2(0.21, 0.21)
-texture = ExtResource("3_idle_sprite")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -0.5)
