@@ -188,6 +188,9 @@ func apply_visual_data():
 	sprite_node.modulate = enemy_data.color_tint
 	
 	print("Applied visual data - Scale: ", enemy_data.sprite_scale, " Tint: ", enemy_data.color_tint)
+	print("DEBUG: Final sprite scale after application: ", sprite_node.scale)
+	print("DEBUG: Sprite frames assigned: ", sprite_node.sprite_frames != null)
+	print("DEBUG: Current animation: ", sprite_node.animation)
 
 func setup_enemy_animations(sprite_node: AnimatedSprite2D):
 	"""Create SpriteFrames resource with idle, walk, and walk_eye animations"""
@@ -222,6 +225,9 @@ func add_spritesheet_frames(sprite_frames: SpriteFrames, animation_name: String,
 	var texture_height = texture.get_height()
 	var frames_x = texture_width / frame_width
 	var frames_y = texture_height / frame_height
+	
+	print("DEBUG: ", animation_name, " texture size: ", texture_width, "x", texture_height)
+	print("DEBUG: Expected frames: ", frames_x, "x", frames_y, " (", frames_x * frames_y, " total)")
 	
 	# Extract each frame
 	for y in frames_y:
