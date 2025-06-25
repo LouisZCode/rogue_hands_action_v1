@@ -13,7 +13,7 @@ var dash_speed: float = 300.0
 var dash_duration: float = 0.6
 
 # Debug/Testing variables
-@export var debug_rock_only: bool = true  # For combat testing - enemy only uses Rock
+@export var debug_rock_only: bool = false  # Use CSV-based stance probabilities
 
 # Combat variables  
 enum Stance { NEUTRAL, ROCK, PAPER, SCISSORS }
@@ -96,8 +96,8 @@ var players_hit_this_dash: Array[Node] = []
 var audio_manager: AudioManager
 
 # Debug visualization
-var debug_detection_range: bool = true  # Set to false to hide
-var debug_attack_range: bool = true  # Show attack collision area
+var debug_detection_range: bool = false  # Detection range circles disabled
+var debug_attack_range: bool = false  # Attack collision circles disabled
 var base_detection_radius: float = 150.0  # Normal detection range
 var enhanced_detection_radius: float = 300.0  # When player is spotted (double size)
 var current_detection_radius: float = 150.0  # Current radius for drawing
@@ -566,21 +566,8 @@ func select_tactical_stance():
 			print("ENEMY: Attack trajectory from ", global_position, " to ", target_attack_position)
 			return
 		
-		# Strategic stance selection based on rock-paper-scissors (disabled in debug mode)
-		match player_stance:
-			Player.Stance.NEUTRAL:
-				# Player is defensive, choose random attacking stance
-				var attacking_stances = [Stance.ROCK, Stance.PAPER, Stance.SCISSORS]
-				current_stance = attacking_stances[randi() % attacking_stances.size()]
-			Player.Stance.ROCK:
-				# Counter with Paper
-				current_stance = Stance.PAPER
-			Player.Stance.PAPER:
-				# Counter with Scissors
-				current_stance = Stance.SCISSORS
-			Player.Stance.SCISSORS:
-				# Counter with Rock
-				current_stance = Stance.ROCK
+		# Stance selection based on CSV probabilities
+		current_stance = select_weighted_stance()
 		
 		update_visual()
 		print("Enemy selected ", Stance.keys()[current_stance], " to counter player's ", Player.Stance.keys()[player_stance])
@@ -1150,8 +1137,8 @@ func _draw():
 		draw_circle(Vector2.ZERO, current_detection_radius, circle_color)  
 		draw_arc(Vector2.ZERO, current_detection_radius, 0, TAU, 64, outline_color, 3.0)
 	
-	# Draw debug attack area (always visible for debugging)
-	if attack_area:
+	# Draw debug attack area (only when debug flag enabled)
+	if debug_attack_range and attack_area:
 		var attack_collision = attack_area.get_child(0) as CollisionShape2D
 		if attack_collision and attack_collision.shape:
 			var shape = attack_collision.shape as CircleShape2D
@@ -1295,7 +1282,12 @@ func can_see_player() -> bool:
 		var enhancement_ratio = current_detection_radius / base_detection_radius
 		effective_vision_range = base_vision_range * enhancement_ratio
 	
+	# Debug logging for problematic enemies
+	var debug_enemy = enemy_data and enemy_data.enemy_name in ["Basic Balanced Enemy", "Stealth Paper Assassin"]
+	
 	if distance > effective_vision_range:
+		if debug_enemy:
+			print("VISION FAIL [%s]: Distance %.1f > Range %.1f" % [enemy_data.enemy_name, distance, effective_vision_range])
 		return false
 	
 	# Check if player is within field of view
@@ -1304,6 +1296,8 @@ func can_see_player() -> bool:
 	var half_fov = deg_to_rad(vision_angle / 2.0)
 	
 	if abs(angle_to_player) > half_fov:
+		if debug_enemy:
+			print("VISION FAIL [%s]: Angle %.1f° > FOV %.1f°" % [enemy_data.enemy_name, rad_to_deg(abs(angle_to_player)), vision_angle/2])
 		return false
 	
 	# Check line of sight with raycasting
@@ -1315,8 +1309,12 @@ func can_see_player() -> bool:
 			var collider = vision_cast.get_collider()
 			# If we hit something other than the player, vision is blocked
 			if collider != player_ref:
+				if debug_enemy:
+					print("VISION FAIL [%s]: Raycast blocked by %s" % [enemy_data.enemy_name, collider.name if collider else "unknown"])
 				return false
 	
+	if debug_enemy:
+		print("VISION SUCCESS [%s]: Player detected!" % enemy_data.enemy_name)
 	return true
 
 func update_vision_detection():
@@ -1328,6 +1326,14 @@ func update_vision_detection():
 	
 	# Use normal vision-based detection
 	var player_visible = can_see_player()
+	
+	# Debug logging for vision detection
+	if enemy_data and enemy_data.enemy_name in ["Basic Balanced Enemy", "Stealth Paper Assassin"]:
+		var debug_state = "VISION DEBUG [%s]: Player visible = %s" % [enemy_data.enemy_name, player_visible]
+		if player_ref:
+			var distance = global_position.distance_to(player_ref.global_position)
+			debug_state += ", Distance = %.1f" % distance
+		print(debug_state)
 	
 	if player_visible:
 		# Player is visible - enter detection state
@@ -1351,13 +1357,21 @@ func check_instant_detection():
 		var distance_to_player = global_position.distance_to(player_ref.global_position)
 		var detection_radius = enemy_data.detection_radius if enemy_data else 500.0
 		
+		# Debug logging for instant detection enemies
+		var debug_enemy = enemy_data and enemy_data.enemy_name in ["Basic Balanced Enemy", "Scissor Scout Enemy", "Stealth Paper Assassin"]
+		
 		if distance_to_player <= detection_radius:
 			# Player is within instant detection range
 			if current_state in [AIState.IDLE, AIState.WALKING]:
+				if debug_enemy:
+					print("INSTANT DETECTION [%s]: Player detected at distance %.1f (max: %.1f)" % [enemy_data.enemy_name, distance_to_player, detection_radius])
 				_handle_player_detected()
-				print("Instant detection triggered! Enemy immediately spotted player at distance: ", distance_to_player)
+			elif debug_enemy:
+				print("INSTANT DETECTION [%s]: Player in range but enemy busy (state: %s)" % [enemy_data.enemy_name, AIState.keys()[current_state]])
 		else:
 			# Player is outside detection radius
+			if debug_enemy:
+				print("INSTANT DETECTION [%s]: Player too far %.1f > %.1f" % [enemy_data.enemy_name, distance_to_player, detection_radius])
 			if player_ref:
 				_handle_player_lost()
 
@@ -1459,3 +1473,39 @@ func detect_mutual_attack_with_body(body) -> bool:
 func _on_attack_area_body_entered(body):
 	# Attack area entry is now handled in the tactical AI states
 	pass
+
+func select_weighted_stance() -> Stance:
+	"""Select stance based on CSV probability weights"""
+	if not enemy_data:
+		# Fallback to random if no data
+		var stances = [Stance.NEUTRAL, Stance.ROCK, Stance.PAPER, Stance.SCISSORS]
+		return stances[randi() % stances.size()]
+	
+	# Get probabilities from enemy data
+	var total_weight = enemy_data.neutral_probability + enemy_data.rock_probability + enemy_data.paper_probability + enemy_data.scissors_probability
+	
+	if total_weight <= 0:
+		# Fallback to balanced if all weights are 0
+		return Stance.ROCK
+	
+	# Generate random number between 0 and total weight
+	var random_value = randf() * total_weight
+	var cumulative_weight = 0.0
+	
+	# Check neutral stance
+	cumulative_weight += enemy_data.neutral_probability
+	if random_value <= cumulative_weight:
+		return Stance.NEUTRAL
+	
+	# Check rock stance
+	cumulative_weight += enemy_data.rock_probability
+	if random_value <= cumulative_weight:
+		return Stance.ROCK
+	
+	# Check paper stance
+	cumulative_weight += enemy_data.paper_probability
+	if random_value <= cumulative_weight:
+		return Stance.PAPER
+	
+	# Default to scissors (or if rounding errors)
+	return Stance.SCISSORS
