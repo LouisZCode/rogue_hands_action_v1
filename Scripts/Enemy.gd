@@ -98,7 +98,7 @@ var players_hit_this_dash: Array[Node] = []
 
 # References
 @onready var sprite: AnimatedSprite2D = $Sprite
-@onready var eye_sprite: AnimatedSprite2D = $EyeSprite
+# eye_sprite reference removed for complete overhaul
 @onready var stance_label: Label = $StanceLabel
 @onready var health_bar: ProgressBar = $HealthBar
 @onready var defense_point_label: Label = $DefensePoint
@@ -188,36 +188,24 @@ func apply_visual_data():
 	if not enemy_data:
 		return
 	
-	# Get both animated sprite nodes
+	# Get base animated sprite node only
 	var sprite_node = get_node("Sprite") as AnimatedSprite2D
-	var eye_sprite_node = get_node("EyeSprite") as AnimatedSprite2D
 	
 	if not sprite_node:
 		print("ERROR: No base AnimatedSprite2D node found")
 		return
 	
-	if not eye_sprite_node:
-		print("ERROR: No EyeSprite AnimatedSprite2D node found")
-		return
-	
 	# Create SpriteFrames for base sprite (idle, walk only)
 	setup_base_animations(sprite_node)
 	
-	# Create SpriteFrames for eye sprite (walk_eye only)
-	setup_eye_animations(eye_sprite_node)
-	
-	# Apply scale to both sprites
+	# Apply scale to sprite
 	sprite_node.scale = enemy_data.sprite_scale
-	eye_sprite_node.scale = enemy_data.sprite_scale
 	
-	# Apply color tint to both sprites
+	# Apply color tint to sprite
 	sprite_node.modulate = enemy_data.color_tint
-	eye_sprite_node.modulate = enemy_data.color_tint
 	
-	# Start both with appropriate animations
+	# Start with appropriate animation
 	sprite_node.play("idle")
-	eye_sprite_node.play("walk_eye")
-	eye_sprite_node.visible = false  # Start hidden
 	
 	# Visual data applied successfully
 
@@ -238,20 +226,7 @@ func setup_base_animations(sprite_node: AnimatedSprite2D):
 	
 	# Base animations ready
 
-func setup_eye_animations(eye_sprite_node: AnimatedSprite2D):
-	# Create SpriteFrames for eye sprite (walk_eye animation only)
-	var sprite_frames = SpriteFrames.new()
-	
-	# Load eye animation spritesheet
-	var walk_eye_texture = preload("res://assets/assets_game/enemy_walking_eye.png")
-	
-	# Add eye animation to SpriteFrames
-	add_spritesheet_frames(sprite_frames, "enemy_eye", walk_eye_texture, 64, 64)
-	
-	# Apply the SpriteFrames to the eye sprite
-	eye_sprite_node.sprite_frames = sprite_frames
-	
-	# Eye animations ready
+# Eye animation setup removed for complete overhaul
 
 func add_spritesheet_frames(sprite_frames: SpriteFrames, animation_name: String, texture: Texture2D, frame_width: int, frame_height: int):
 	# Extract frames from a spritesheet and add them to SpriteFrames
@@ -334,7 +309,6 @@ func _ready():
 	
 	# Debug: Check scene node structure
 	print("Sprite node: ", $Sprite if has_node("Sprite") else "MISSING!")
-	print("EyeSprite node: ", $EyeSprite if has_node("EyeSprite") else "MISSING!")
 	
 	# Initialize audio manager
 	audio_manager = AudioManager.new()
@@ -359,9 +333,7 @@ func _ready():
 	
 	# Final debug check
 	print("Final sprite reference: ", sprite)
-	print("Final eye_sprite reference: ", eye_sprite)
 	print("Sprite visible: ", sprite.visible if sprite else "N/A")
-	print("Eye visible: ", eye_sprite.visible if eye_sprite else "N/A")
 	print("=== ENEMY INITIALIZATION COMPLETE ===")
 	
 	# Setup vision casting (no signal connections needed for raycasting)
@@ -1200,13 +1172,10 @@ func update_visual():
 	if current_stance != Stance.NEUTRAL and current_state == AIState.STANCE_SELECTION:
 		# Show stance-specific static sprite during stance selection only
 		show_stance_sprite()
-		# Hide eye sprite during stance display (base sprite shows stance)
-		if eye_sprite:
-			eye_sprite.visible = false
 	else:
 		# Show animated sprites in all other cases (including ATTACKING with neutral stance)
 		restore_animated_sprites()
-		# Handle normal animation and eye sprite logic
+		# Handle normal animation logic
 		update_animated_sprites()
 	
 	# Rotation is now integrated with movement functions
@@ -1233,33 +1202,7 @@ func update_animated_sprites():
 					sprite.play("walk")
 				current_animation_state = "walking"
 	
-	# Control eye sprite visibility and animation
-	if eye_sprite:
-		if eye_sprite.sprite_frames:
-			match current_state:
-				AIState.WALKING, AIState.IDLE:
-					# Show eye overlay during walking and idle states
-					eye_sprite.visible = true
-					if eye_sprite.animation != "enemy_eye":
-						eye_sprite.play("enemy_eye")
-				AIState.ALERT, AIState.OBSERVING:
-					# Show eye overlay during alert states
-					eye_sprite.visible = true
-					if eye_sprite.animation != "enemy_eye":
-						eye_sprite.play("enemy_eye")
-				AIState.ATTACKING, AIState.RETREATING:
-					# Show eye overlay during attacking and retreating (when not showing stance sprite)
-					eye_sprite.visible = true
-					if eye_sprite.animation != "enemy_eye":
-						eye_sprite.play("enemy_eye")
-				_:
-					# Hide eye overlay only in stance selection and stunned states
-					eye_sprite.visible = false
-		else:
-			# Eye sprite needs sprite_frames setup - try to set it up now
-			setup_eye_animations(eye_sprite)
-	else:
-		pass  # Eye sprite node not found
+	# Eye sprite control removed for complete overhaul
 
 func show_stance_sprite():
 	# Create SpriteFrames with stance texture for AnimatedSprite2D compatibility
@@ -1291,17 +1234,11 @@ func restore_animated_sprites():
 		setup_base_animations(sprite)  # Restore animation frames
 		sprite.visible = true
 	
-	if eye_sprite:
-		setup_eye_animations(eye_sprite)  # Restore eye animations
-		# Ensure eye sprite is visible and ready for state-based control
-		eye_sprite.visible = true
+	# Eye sprite restoration removed for complete overhaul
 
 # Old separate rotation function removed - rotation is now integrated with movement
 
-func sync_eye_sprite_rotation():
-	# Sync eye sprite rotation with main sprite (like player)
-	if eye_sprite and sprite:
-		eye_sprite.rotation_degrees = sprite.rotation_degrees
+# Eye sprite rotation sync removed for complete overhaul
 
 func apply_movement_with_rotation(new_velocity: Vector2):
 	# Integrated movement and rotation system (like player)
@@ -1327,9 +1264,6 @@ func apply_movement_with_rotation(new_velocity: Vector2):
 				rotation_tween.kill()
 			rotation_tween = create_tween()
 			rotation_tween.tween_property(sprite, "rotation_degrees", normalized_target, 0.2)
-			
-			# Sync eye sprite rotation with main sprite
-			sync_eye_sprite_rotation()
 
 func get_shortest_angle_difference(current_angle: float, target_angle: float) -> float:
 	# Calculate shortest path between angles (like player)
@@ -1749,6 +1683,7 @@ func _handle_player_lost():
 func update_enemy_dash_preview():
 	# Show simple trajectory line from enemy position to target when attacking (but hide during actual dash)
 	if not dash_preview:
+		print("DEBUG: No dash_preview component found!")
 		return
 	
 	# Show trajectory only during ATTACKING state charge-up, hide when actually dashing
@@ -1758,15 +1693,13 @@ func update_enemy_dash_preview():
 		var enemy_dash_distance = dash_speed * dash_duration  # 300 * 0.6 = 180 pixels
 		var relative_target = direction_to_target * enemy_dash_distance
 		dash_preview.show_simple_dash_line(relative_target)
-		# Debug: Showing dash preview during charge-up (reduced spam)
-		if fmod(Time.get_time_dict_from_system()["second"], 1.0) < 0.1:  # Only print occasionally
-			print("DEBUG: Showing dash line - State: ATTACKING, Stance: ", current_stance, ", is_dashing: ", is_dashing)
+		print("DEBUG: SHOWING dash line - State: ATTACKING, Stance: ", current_stance, ", is_dashing: ", is_dashing)
 	else:
 		# Hide trajectory if not charging attack or if currently dashing
 		dash_preview.hide_dash_trajectory()
 		# Debug: Hiding dash preview
-		if current_state == AIState.ATTACKING:
-			print("DEBUG: Hiding dash line - State: ATTACKING, is_dashing: ", is_dashing, ", stance: ", current_stance)
+		if current_state == AIState.ATTACKING or is_dashing:
+			print("DEBUG: HIDING dash line - State: ", AIState.keys()[current_state], ", is_dashing: ", is_dashing, ", stance: ", current_stance)
 
 func add_immunity_visual_feedback():
 	# Create flickering effect during immunity frames
