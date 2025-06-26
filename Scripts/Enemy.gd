@@ -70,7 +70,7 @@ var movement_threshold: float = 5.0  # Minimum velocity for rotation
 
 # Debug output control
 var debug_timer: float = 0.0
-var debug_interval: float = 0.2  # Print debug every 0.2 seconds
+var debug_interval: float = 1.0  # Print debug every 1.0 seconds
 
 # Idle and lost player state variables
 var idle_timer: float = 0.0
@@ -388,13 +388,14 @@ func _physics_process(delta):
 	if is_dashing:
 		print("DEBUG _physics_process: Enemy is dashing - position: ", global_position, " dash_timer: ", dash_timer)
 	
-	# Update vision detection system
+	# Update AI state management FIRST (allows proper state transitions like WALKING → IDLE)
+	update_ai(delta)
+	
+	# Update vision detection system SECOND (respects state changes made by AI system)
 	vision_timer += delta
 	if vision_timer >= vision_check_interval:
 		vision_timer = 0.0
 		update_vision_detection()
-	
-	update_ai(delta)
 	update_timers(delta)
 	handle_dash_movement(delta)
 	
@@ -425,6 +426,7 @@ func update_ai(delta):
 			hide_all_indicators()
 			# Check if idle time is over
 			if idle_timer <= 0:
+				print("DEBUG: IDLE TIMER EXPIRED - Returning to WALKING state")
 				current_state = AIState.WALKING
 				pick_new_walking_direction()
 				walking_timer = direction_change_interval
@@ -588,6 +590,7 @@ func handle_walking_movement():
 		if randf() < 0.4:
 			current_state = AIState.IDLE
 			idle_timer = idle_duration_min  # Fixed 3-second duration for consistent idle animation
+			print("DEBUG: ENEMY ENTERING IDLE STATE - Duration: ", idle_timer, " seconds")
 			# Start deceleration when going idle
 			current_speed = 0.0
 			return
@@ -1184,6 +1187,14 @@ func update_visual():
 func update_animated_sprites():
 	# Update base sprite animation and track animation state
 	if sprite and sprite.sprite_frames:
+		# IMPORTANT: Respect idle timer protection (prevent interrupting 3-second idle animation)
+		if current_state == AIState.IDLE and idle_timer > 0:
+			# Don't change animation during protected idle period
+			if sprite.animation != "idle":
+				sprite.play("idle")
+			current_animation_state = "idle"
+			return
+			
 		match current_state:
 			AIState.IDLE, AIState.STUNNED, AIState.POSITIONING, AIState.STANCE_SELECTION:
 				if sprite.animation != "idle":
@@ -1277,8 +1288,8 @@ func get_shortest_angle_difference(current_angle: float, target_angle: float) ->
 	return diff
 
 func print_enemy_status_debug():
-	# Controlled debug output every 0.2 seconds (only when moving or in combat)
-	var should_debug = velocity.length() > 1.0 or current_state != AIState.WALKING
+	# Controlled debug output every 1.0 seconds (only when moving or in combat states)
+	var should_debug = velocity.length() > 1.0 or current_state != AIState.WALKING or current_state == AIState.IDLE
 	if should_debug:
 		var rotation_value = sprite.rotation_degrees if sprite else 0.0
 		print("=== ENEMY STATUS DEBUG ===")
@@ -1286,6 +1297,11 @@ func print_enemy_status_debug():
 		print("Position: ", global_position)
 		print("Velocity: ", velocity, " (magnitude: ", velocity.length(), ")")
 		print("Current Rotation: ", rotation_value, "°")
+		
+		# Special debug for IDLE state
+		if current_state == AIState.IDLE:
+			print("IDLE Timer Remaining: ", idle_timer, " seconds")
+		
 		print("==========================")
 
 func update_health_bar():
@@ -1601,11 +1617,15 @@ func check_instant_detection():
 		
 		if distance_to_player <= detection_radius:
 			# Player is within instant detection range
-			if current_state in [AIState.IDLE, AIState.WALKING]:
+			# IMPORTANT: Respect IDLE state protection (same logic as vision system)
+			if current_state == AIState.WALKING or (current_state == AIState.IDLE and idle_timer <= 0):
 				if debug_enemy:
 					# Debug: Instant detection successful
 					pass
 				_handle_player_detected()
+			elif current_state == AIState.IDLE and idle_timer > 0:
+				# Debug: Instant detection blocked by idle protection
+				print("DEBUG: Instant detection blocked - IDLE protected (", idle_timer, " seconds remaining)")
 			elif debug_enemy:
 				# Debug: Enemy busy during detection
 				pass
@@ -1630,7 +1650,8 @@ func _handle_player_detected():
 		alert_indicator.visible = false
 	
 	# Check if we were in patrol states (trigger alert)
-	var was_patrolling = current_state in [AIState.WALKING, AIState.IDLE]
+	# IMPORTANT: Don't interrupt IDLE state until timer expires (protect 3-second idle animation)
+	var was_patrolling = current_state == AIState.WALKING or (current_state == AIState.IDLE and idle_timer <= 0)
 	
 	if was_patrolling:
 		# Show alert first
@@ -1640,6 +1661,9 @@ func _handle_player_detected():
 		# Debug logging for Enemy 1
 		if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
 			print("AI STATE [%s]: %s → ALERT (alert_timer: %.1f)" % [enemy_data.enemy_name, "WALKING/IDLE", alert_timer])
+	elif current_state == AIState.IDLE and idle_timer > 0:
+		# Debug: Player detected but idle state protected
+		print("DEBUG: Player detected but IDLE state protected (", idle_timer, " seconds remaining)")
 	else:
 		# Debug logging for Enemy 1 - why not patrolling?
 		if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":

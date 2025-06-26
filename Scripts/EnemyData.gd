@@ -23,10 +23,10 @@ enum DetectionType { VISION, AUTOMATIC, PROXIMITY }
 @export var detection_type: DetectionType = DetectionType.VISION
 @export var instant_detection: bool = false  # Skip vision, detect immediately when player enters room
 @export var detection_radius: float = 500.0  # Range for instant detection (room-wide)
-@export var detection_range: float = 150.0
-@export var enhanced_detection_radius: float = 300.0
+@export var detection_range: float = 40.0
+@export var enhanced_detection_radius: float = 80.0
 @export var vision_angle: float = 60.0  # degrees (for vision-based detection)
-@export var vision_range: float = 200.0  # pixels (for vision-based detection)
+@export var vision_range: float = 50.0  # pixels (for vision-based detection)
 @export var vision_collision_mask: int = 2  # Which layers block vision (walls/obstacles)
 
 # === COMBAT BEHAVIOR ===
