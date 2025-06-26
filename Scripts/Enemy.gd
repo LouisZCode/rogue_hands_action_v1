@@ -109,7 +109,7 @@ var players_hit_this_dash: Array[Node] = []
 @onready var attack_area: Area2D = $AttackArea
 @onready var audio_player: AudioStreamPlayer2D = $AudioPlayer
 @onready var attack_timer_bar: ProgressBar = $AttackTimerBar
-@onready var dash_preview: DashPreview = $DashPreview
+# dash_preview reference removed for complete overhaul
 
 # Audio management
 var audio_manager: AudioManager
@@ -292,6 +292,10 @@ func apply_enemy_data():
 	stance_decision_timer = enemy_data.get_aggression_modified_timer(enemy_data.stance_decision_timer)
 	retreat_timer = enemy_data.get_aggression_modified_timer(enemy_data.retreat_timer)
 	
+	# Load idle timing (fixed duration, no aggression modifier for consistent idle behavior)
+	idle_duration_min = enemy_data.idle_duration
+	idle_duration_max = enemy_data.idle_duration  # Same value for fixed duration
+	
 	# Apply collision settings
 	apply_collision_settings()
 	
@@ -325,9 +329,7 @@ func _ready():
 		print("No enemy_data found, loading defaults...")
 		load_enemy_data()
 	
-	# Initialize dash preview for enemy
-	if dash_preview:
-		dash_preview.set_enemy_style()
+	# Dash preview initialization removed for complete overhaul
 	
 	update_visual()
 	
@@ -514,8 +516,7 @@ func update_ai(delta):
 					pass
 			
 		AIState.ATTACKING:
-			# Show dash trajectory to target position
-			update_enemy_dash_preview()
+			# Dash trajectory display removed for complete overhaul
 			# Once in attacking state, commit to the attack regardless of player position
 			if current_stance != Stance.NEUTRAL:
 				# Only attack after 2-second delay and cooldown is ready
@@ -527,14 +528,10 @@ func update_ai(delta):
 				# Hide attack timer when exiting attacking state
 				if attack_timer_bar:
 					attack_timer_bar.visible = false
-				# Hide dash preview when exiting attacking state
-				if dash_preview:
-					dash_preview.hide_dash_trajectory()
+				# Dash preview hiding removed for complete overhaul
 				
 		AIState.RETREATING:
-			# Hide dash preview when retreating
-			if dash_preview:
-				dash_preview.hide_dash_trajectory()
+			# Dash preview hiding removed for complete overhaul
 			# Move away and return to neutral
 			if player_ref:
 				retreat_from_player()
@@ -590,7 +587,7 @@ func handle_walking_movement():
 		# 40% chance to go idle instead of continuing to walk
 		if randf() < 0.4:
 			current_state = AIState.IDLE
-			idle_timer = randf_range(idle_duration_min, idle_duration_max)
+			idle_timer = idle_duration_min  # Fixed 3-second duration for consistent idle animation
 			# Start deceleration when going idle
 			current_speed = 0.0
 			return
@@ -1685,26 +1682,7 @@ func _handle_player_lost():
 			current_state = AIState.WALKING
 			# print("Enemy lost sight of player (returning to patrol)")
 
-func update_enemy_dash_preview():
-	# Show simple trajectory line from enemy position to target when attacking (but hide during actual dash)
-	if not dash_preview:
-		print("DEBUG: No dash_preview component found!")
-		return
-	
-	# Show trajectory only during ATTACKING state charge-up, hide when actually dashing
-	if current_state == AIState.ATTACKING and current_stance != Stance.NEUTRAL and player_ref and not is_dashing:
-		# Calculate direction to target and apply consistent dash distance
-		var direction_to_target = (target_attack_position - global_position).normalized()
-		var enemy_dash_distance = dash_speed * dash_duration  # 300 * 0.6 = 180 pixels
-		var relative_target = direction_to_target * enemy_dash_distance
-		dash_preview.show_simple_dash_line(relative_target)
-		print("DEBUG: SHOWING dash line - State: ATTACKING, Stance: ", current_stance, ", is_dashing: ", is_dashing)
-	else:
-		# Hide trajectory if not charging attack or if currently dashing
-		dash_preview.hide_dash_trajectory()
-		# Debug: Hiding dash preview
-		if current_state == AIState.ATTACKING or is_dashing:
-			print("DEBUG: HIDING dash line - State: ", AIState.keys()[current_state], ", is_dashing: ", is_dashing, ", stance: ", current_stance)
+# update_enemy_dash_preview() function removed for complete overhaul
 
 func add_immunity_visual_feedback():
 	# Create flickering effect during immunity frames

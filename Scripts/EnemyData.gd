@@ -52,6 +52,7 @@ enum DetectionType { VISION, AUTOMATIC, PROXIMITY }
 @export var positioning_timer_min: float = 1.0
 @export var positioning_timer_max: float = 2.0
 @export var retreat_timer: float = 1.0
+@export var idle_duration: float = 3.0  # Fixed duration for idle animation (seconds)
 @export var aggression_level: float = 1.0  # Multiplier for timing (higher = faster)
 
 # === REACTIVE AI (Future) ===
