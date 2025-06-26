@@ -1264,6 +1264,11 @@ func apply_movement_with_rotation(new_velocity: Vector2):
 				rotation_tween.kill()
 			rotation_tween = create_tween()
 			rotation_tween.tween_property(sprite, "rotation_degrees", normalized_target, 0.2)
+			
+			# Sync eye sprite rotation with main sprite (if eye sprite exists)
+			var eye_sprite_node = get_node("EyeSprite") if has_node("EyeSprite") else null
+			if eye_sprite_node:
+				eye_sprite_node.rotation_degrees = normalized_target
 
 func get_shortest_angle_difference(current_angle: float, target_angle: float) -> float:
 	# Calculate shortest path between angles (like player)
