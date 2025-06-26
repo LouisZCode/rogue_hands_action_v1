@@ -2,24 +2,24 @@ extends CharacterBody2D
 class_name Player
 
 # Movement variables
-@export var speed: float = 200.0
-@export var dash_speed: float = 600.0
-@export var dash_duration: float = 0.3  # Half of enemy dash distance
+@export var speed: float = GameConstants.PLAYER_SPEED
+@export var dash_speed: float = GameConstants.PLAYER_DASH_SPEED
+@export var dash_duration: float = GameConstants.PLAYER_DASH_DURATION  # Half of enemy dash distance
 
 # Movement interpolation
-@export var acceleration: float = 800.0  # Units per second squared (4x speed for responsive feel)
-@export var deceleration: float = 1000.0  # Units per second squared (5x speed for quick stops)
+@export var acceleration: float = GameConstants.PLAYER_ACCELERATION  # Units per second squared (4x speed for responsive feel)
+@export var deceleration: float = GameConstants.PLAYER_DECELERATION  # Units per second squared (5x speed for quick stops)
 var current_speed: float = 0.0  # Current movement speed
 
 # Combat variables
 enum Stance { NEUTRAL, ROCK, PAPER, SCISSORS }
 var current_stance: Stance = Stance.NEUTRAL
-var max_health: int = 5
-var current_health: int = 5
+var max_health: int = GameConstants.PLAYER_MAX_HEALTH
+var current_health: int = GameConstants.PLAYER_MAX_HEALTH
 
 # Defense point system
-var max_defense_points: int = 3
-var current_defense_points: int = 3
+var max_defense_points: int = GameConstants.PLAYER_MAX_DEFENSE_POINTS
+var current_defense_points: int = GameConstants.PLAYER_MAX_DEFENSE_POINTS
 
 # Dash variables
 var is_dashing: bool = false
@@ -28,21 +28,21 @@ var dash_timer: float = 0.0
 var dash_preserved_scale: Vector2 = Vector2.ZERO  # Store scale before dash to prevent corruption
 
 # Attack cooldown - increased to 1 second for balance
-@export var attack_cooldown: float = 1.0
+@export var attack_cooldown: float = GameConstants.ATTACK_COOLDOWN
 var attack_cooldown_timer: float = 0.0
 
 # Immunity frames to prevent multiple hits
-@export var immunity_duration: float = 0.5
+@export var immunity_duration: float = GameConstants.IMMUNITY_DURATION
 var immunity_timer: float = 0.0
 var is_immune: bool = false
 
 # Stun system
-@export var stun_duration: float = 3.0
+@export var stun_duration: float = GameConstants.STUN_DURATION
 var stun_timer: float = 0.0
 var is_stunned: bool = false
 
 # Parry window system
-@export var parry_window_duration: float = 0.5
+@export var parry_window_duration: float = GameConstants.PARRY_WINDOW_DURATION
 var parry_window_timer: float = 0.0
 var is_parry_window_active: bool = false
 
@@ -51,11 +51,11 @@ var enemies_hit_this_dash: Array[Node] = []
 
 # Animation state management
 var current_animation_state: String = "idle"
-var movement_threshold: float = 10.0  # Minimum velocity to trigger walking animation
+var movement_threshold: float = GameConstants.MOVEMENT_THRESHOLD  # Minimum velocity to trigger walking animation
 
 # Long idle system
 var idle_timer: float = 0.0
-var long_idle_delay: float = 5.0  # 5 seconds before long idle triggers
+var long_idle_delay: float = GameConstants.LONG_IDLE_DELAY  # 5 seconds before long idle triggers
 var is_in_long_idle: bool = false
 
 var base_position: Vector2
@@ -64,7 +64,7 @@ var base_scale: Vector2 = Vector2(1.0, 1.0)
 # Directional rotation
 var current_rotation: float = 0.0
 var rotation_tween: Tween
-var stance_rotation_speed: float = 0.15  # Faster rotation for stance feedback
+var stance_rotation_speed: float = GameConstants.STANCE_ROTATION_SPEED  # Faster rotation for stance feedback
 
 # Direction preservation system
 var last_movement_direction: float = 0.0  # Preserve last walking direction
@@ -291,9 +291,9 @@ func handle_movement(delta):
 				# print("DEBUG: Player colliding with enemy - Player pos: ", global_position, " Enemy pos: ", enemy.global_position, " Distance: ", distance)
 				
 				# Apply separation force if too close and not dashing
-				if distance < 30.0 and not is_dashing and not enemy.is_currently_dashing():
+				if distance < GameConstants.SEPARATION_DISTANCE_THRESHOLD and not is_dashing and not enemy.is_currently_dashing():
 					var separation_direction = (global_position - enemy.global_position).normalized()
-					var separation_force = separation_direction * 50.0  # Push away gently
+					var separation_force = separation_direction * GameConstants.PLAYER_SEPARATION_FORCE  # Push away gently
 					velocity += separation_force
 					# print("DEBUG: Applying separation force to player: ", separation_force)
 
@@ -509,11 +509,11 @@ func apply_screen_shake_by_category(category: DamageCategory):
 			# No shake for no damage
 			pass
 		DamageCategory.LIGHT:
-			start_screen_shake(3.0, 0.15)  # Very light shake
+			start_screen_shake(GameConstants.SCREEN_SHAKE_LIGHT, GameConstants.SCREEN_SHAKE_DURATION_SHORT)  # Very light shake
 		DamageCategory.NORMAL:
-			start_screen_shake(8.0, 0.25)  # Medium shake
+			start_screen_shake(GameConstants.SCREEN_SHAKE_NORMAL, GameConstants.SCREEN_SHAKE_DURATION_NORMAL)  # Medium shake
 		DamageCategory.HEAVY:
-			start_screen_shake(20.0, 0.5)  # Strong shake
+			start_screen_shake(GameConstants.SCREEN_SHAKE_HEAVY, GameConstants.SCREEN_SHAKE_DURATION_LONG)  # Strong shake
 
 func get_current_input_direction() -> Vector2:
 	# Get current directional input (reused for dash attacks and stance rotation)
@@ -736,7 +736,7 @@ func update_animation_state(delta):
 			if rotation_tween:
 				rotation_tween.kill()
 			rotation_tween = create_tween()
-			rotation_tween.tween_property(sprite, "rotation_degrees", normalized_target, 0.2)
+			rotation_tween.tween_property(sprite, "rotation_degrees", normalized_target, GameConstants.ROTATION_TWEEN_DURATION)
 	# Note: Removed auto-return to neutral rotation - hand maintains last direction when idle
 
 func perform_dash_attack(direction: Vector2):
@@ -783,7 +783,7 @@ func attack_during_dash():
 			# Add enemy to the list of already hit enemies
 			enemies_hit_this_dash.append(body)
 			# Light screen shake for successful hit
-			start_screen_shake(8.0, 0.15)
+			start_screen_shake(GameConstants.SCREEN_SHAKE_NORMAL, GameConstants.SCREEN_SHAKE_DURATION_SHORT)
 
 func take_damage(amount: int):
 	# Don't take damage if immune
@@ -908,7 +908,7 @@ func apply_stun():
 	
 	# Visual feedback for stun
 	var tween = create_tween()
-	tween.tween_property(sprite, "modulate", Color.PURPLE, 0.2)
+	tween.tween_property(sprite, "modulate", Color.PURPLE, GameConstants.DAMAGE_FEEDBACK_DURATION)
 	# Show stun indicator
 	if stun_indicator:
 		stun_indicator.visible = true
@@ -982,7 +982,7 @@ func perfect_parry_success():
 	if parry_circle:
 		parry_circle.show_perfect_parry_flash()
 	# Add screen shake for feedback
-	start_screen_shake(12.0, 0.3)
+	start_screen_shake(GameConstants.SCREEN_SHAKE_NORMAL + 4.0, GameConstants.SCREEN_SHAKE_DURATION_NORMAL)
 	# V2: Restore defense point on perfect parry
 	restore_defense_point()
 	# Play perfect parry sound

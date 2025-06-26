@@ -6,11 +6,11 @@ class_name Enemy
 var default_data: EnemyData  # Fallback if no resource assigned
 
 # AI and movement variables (loaded from resource)
-var speed: float = 100.0
-var detection_range: float = 150.0
-var attack_range: float = 100.0
-var dash_speed: float = 300.0
-var dash_duration: float = 0.6
+var speed: float = GameConstants.ENEMY_SPEED
+var detection_range: float = GameConstants.BASE_DETECTION_RADIUS
+var attack_range: float = GameConstants.ATTACK_RANGE
+var dash_speed: float = GameConstants.ENEMY_DASH_SPEED
+var dash_duration: float = GameConstants.ENEMY_DASH_DURATION
 
 # Debug/Testing variables
 @export var debug_rock_only: bool = false  # Use CSV-based stance probabilities
@@ -18,12 +18,12 @@ var dash_duration: float = 0.6
 # Combat variables  
 enum Stance { NEUTRAL, ROCK, PAPER, SCISSORS }
 var current_stance: Stance = Stance.NEUTRAL  # Start in neutral like player
-var max_health: int = 5
-var current_health: int = 5
+var max_health: int = GameConstants.ENEMY_MAX_HEALTH
+var current_health: int = GameConstants.ENEMY_MAX_HEALTH
 
 # Defense point system
-var max_defense_points: int = 1
-var current_defense_points: int = 1
+var max_defense_points: int = GameConstants.ENEMY_MAX_DEFENSE_POINTS
+var current_defense_points: int = GameConstants.ENEMY_MAX_DEFENSE_POINTS
 
 # AI State - Enhanced tactical system
 enum AIState { IDLE, WALKING, LOST_PLAYER, ALERT, OBSERVING, POSITIONING, STANCE_SELECTION, ATTACKING, RETREATING, STUNNED }
@@ -31,7 +31,7 @@ var current_state: AIState = AIState.WALKING
 var player_ref: Player = null
 
 # Attack system mirroring player
-var attack_cooldown: float = 1.2  # Slightly longer than player
+var attack_cooldown: float = GameConstants.ENEMY_ATTACK_COOLDOWN  # Slightly longer than player
 var attack_timer: float = 0.0
 var is_dashing: bool = false
 var dash_direction: Vector2 = Vector2.ZERO
@@ -42,21 +42,21 @@ var stance_decision_timer: float = 0.0
 var positioning_timer: float = 0.0
 var retreat_timer: float = 0.0
 var last_player_stance: Player.Stance = Player.Stance.NEUTRAL
-var stance_change_cooldown: float = 0.5
+var stance_change_cooldown: float = GameConstants.STANCE_CHANGE_COOLDOWN
 var stance_change_timer: float = 0.0
-var stance_to_dash_delay: float = 1.0  # 1 second delay after stance change (reduced for testing)
+var stance_to_dash_delay: float = GameConstants.STANCE_TO_DASH_DELAY  # 1 second delay after stance change (reduced for testing)
 var stance_to_dash_timer: float = 0.0
 var target_attack_position: Vector2  # Store player position when stance is selected
 
 # Walking state variables
 var walking_direction: Vector2 = Vector2.ZERO
 var walking_timer: float = 0.0
-var walking_speed: float = 50.0  # Slower than normal speed
-var direction_change_interval: float = 2.5  # Change direction every 2.5 seconds
+var walking_speed: float = GameConstants.ENEMY_WALKING_SPEED  # Slower than normal speed
+var direction_change_interval: float = GameConstants.DIRECTION_CHANGE_INTERVAL  # Change direction every 2.5 seconds
 
 # Movement interpolation (like player)
-var acceleration: float = 400.0  # Slower than player for more deliberate movement
-var deceleration: float = 600.0  # Quicker stopping
+var acceleration: float = GameConstants.ENEMY_ACCELERATION  # Slower than player for more deliberate movement
+var deceleration: float = GameConstants.ENEMY_DECELERATION  # Quicker stopping
 var current_speed: float = 0.0  # Current movement speed
 
 # Rotation system (like player)
@@ -66,31 +66,31 @@ var last_movement_direction: float = 0.0
 
 # Animation state tracking (like player)
 var current_animation_state: String = "idle"
-var movement_threshold: float = 5.0  # Minimum velocity for rotation
+var movement_threshold: float = GameConstants.ENEMY_MOVEMENT_THRESHOLD  # Minimum velocity for rotation
 
 # Debug output control
 var debug_timer: float = 0.0
-var debug_interval: float = 1.0  # Print debug every 1.0 seconds
+var debug_interval: float = GameConstants.DEBUG_INTERVAL  # Print debug every 1.0 seconds
 
 # Idle and lost player state variables
 var idle_timer: float = 0.0
-var idle_duration_min: float = 2.0  # Doubled from 1.0
-var idle_duration_max: float = 6.0  # Doubled from 3.0
+var idle_duration_min: float = GameConstants.IDLE_DURATION_MIN  # Doubled from 1.0
+var idle_duration_max: float = GameConstants.IDLE_DURATION_MAX  # Doubled from 3.0
 var lost_player_timer: float = 0.0
-var lost_player_duration: float = 2.5  # Time spent confused before giving up
+var lost_player_duration: float = GameConstants.LOST_PLAYER_DURATION  # Time spent confused before giving up
 
 # Alert state variables
 var alert_timer: float = 0.0
-var alert_duration: float = 1.0  # 1 second alert display
+var alert_duration: float = GameConstants.ALERT_DURATION  # 1 second alert display
 var is_alerting: bool = false
 
 # Immunity frames to prevent multiple hits
-@export var immunity_duration: float = 0.5
+@export var immunity_duration: float = GameConstants.IMMUNITY_DURATION
 var immunity_timer: float = 0.0
 var is_immune: bool = false
 
 # Stun system (enhanced existing STUNNED state)
-@export var stun_duration: float = 3.0
+@export var stun_duration: float = GameConstants.STUN_DURATION
 var stun_timer: float = 0.0
 
 # Track which players have been hit during current dash
@@ -117,15 +117,15 @@ var audio_manager: AudioManager
 # Debug visualization
 var debug_detection_range: bool = false  # Detection range circles disabled
 var debug_attack_range: bool = false  # Attack collision circles disabled
-var base_detection_radius: float = 150.0  # Normal detection range
-var enhanced_detection_radius: float = 300.0  # When player is spotted (double size)
-var current_detection_radius: float = 150.0  # Current radius for drawing
+var base_detection_radius: float = GameConstants.BASE_DETECTION_RADIUS  # Normal detection range
+var enhanced_detection_radius: float = GameConstants.ENHANCED_DETECTION_RADIUS  # When player is spotted (double size)
+var current_detection_radius: float = GameConstants.BASE_DETECTION_RADIUS  # Current radius for drawing
 
 # Vision system
 var facing_direction: Vector2 = Vector2(1, 0)  # Default facing right
 var last_player_position: Vector2 = Vector2.ZERO
 var vision_timer: float = 0.0
-var vision_check_interval: float = 0.1  # Check vision 10 times per second
+var vision_check_interval: float = GameConstants.VISION_CHECK_INTERVAL  # Check vision 10 times per second
 
 # Stance colors and symbols (enemy uses all stances tactically)
 var stance_colors = {
@@ -495,7 +495,7 @@ func update_ai(delta):
 				var distance = global_position.distance_to(player_ref.global_position)
 				if distance <= attack_range * 1.5 and attack_timer <= 0:
 					current_state = AIState.STANCE_SELECTION
-					stance_decision_timer = 0.3  # Time to decide stance
+					stance_decision_timer = GameConstants.STANCE_DECISION_TIMER  # Time to decide stance
 					# Debug logging for Enemy 1
 					if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
 						# Debug: Entering stance selection
@@ -526,7 +526,7 @@ func update_ai(delta):
 					perform_dash_attack()
 			else:
 				current_state = AIState.RETREATING
-				retreat_timer = 1.0
+				retreat_timer = GameConstants.RETREAT_TIMER
 				# Hide attack timer when exiting attacking state
 				if attack_timer_bar:
 					attack_timer_bar.visible = false
@@ -558,7 +558,7 @@ func update_ai(delta):
 			# Check if stun timer is done
 			if stun_timer <= 0:
 				current_state = AIState.RETREATING
-				retreat_timer = 1.0
+				retreat_timer = GameConstants.RETREAT_TIMER
 				# Hide stun indicator when stun ends
 				if stun_indicator:
 					stun_indicator.visible = false
@@ -577,9 +577,9 @@ func update_ai(delta):
 					# print("DEBUG: Enemy colliding with player - Enemy pos: ", global_position, " Player pos: ", player.global_position, " Distance: ", distance)
 					
 					# Apply separation force if too close and not dashing
-					if distance < 30.0 and not is_dashing and not player.is_currently_dashing():
+					if distance < GameConstants.SEPARATION_DISTANCE_THRESHOLD and not is_dashing and not player.is_currently_dashing():
 						var separation_direction = (global_position - player.global_position).normalized()
-						var separation_force = separation_direction * 40.0  # Push away gently
+						var separation_force = separation_direction * GameConstants.ENEMY_SEPARATION_FORCE  # Push away gently
 						velocity += separation_force
 						# print("DEBUG: Applying separation force to enemy: ", separation_force)
 
@@ -639,8 +639,8 @@ func is_near_boundary() -> bool:
 
 func is_position_near_boundary(pos: Vector2) -> bool:
 	# Check if position is near arena boundaries (with some margin)
-	var margin = 50.0
-	return pos.x < -425 + margin or pos.x > 425 - margin or pos.y < -275 + margin or pos.y > 275 - margin
+	var margin = GameConstants.BOUNDARY_MARGIN
+	return pos.x < GameConstants.LEVEL_BOUNDARY_LEFT + margin or pos.x > GameConstants.LEVEL_BOUNDARY_RIGHT - margin or pos.y < GameConstants.LEVEL_BOUNDARY_TOP + margin or pos.y > GameConstants.LEVEL_BOUNDARY_BOTTOM - margin
 
 # New AI methods for tactical combat
 func observe_player():
@@ -735,7 +735,7 @@ func handle_dash_movement(delta):
 			current_stance = Stance.NEUTRAL
 			update_visual()
 			current_state = AIState.RETREATING
-			retreat_timer = 1.0
+			retreat_timer = GameConstants.RETREAT_TIMER
 			# Hide debug attack range when dash ends
 			if debug_attack_range:
 				queue_redraw()
@@ -1091,7 +1091,7 @@ func take_damage(amount: int):
 
 func _set_retreating_state():
 	current_state = AIState.RETREATING
-	retreat_timer = 1.0
+	retreat_timer = GameConstants.RETREAT_TIMER
 
 func update_timers(delta):
 	# Update debug timer for controlled output
