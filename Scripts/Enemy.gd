@@ -54,10 +54,24 @@ var walking_timer: float = 0.0
 var walking_speed: float = 50.0  # Slower than normal speed
 var direction_change_interval: float = 2.5  # Change direction every 2.5 seconds
 
+# Movement interpolation (like player)
+var acceleration: float = 400.0  # Slower than player for more deliberate movement
+var deceleration: float = 600.0  # Quicker stopping
+var current_speed: float = 0.0  # Current movement speed
+
+# Rotation system (like player)
+var current_rotation: float = 0.0
+var rotation_tween: Tween
+var last_movement_direction: float = 0.0
+
+# Animation state tracking (like player)
+var current_animation_state: String = "idle"
+var movement_threshold: float = 5.0  # Minimum velocity for rotation
+
 # Idle and lost player state variables
 var idle_timer: float = 0.0
-var idle_duration_min: float = 1.0
-var idle_duration_max: float = 3.0
+var idle_duration_min: float = 2.0  # Doubled from 1.0
+var idle_duration_max: float = 6.0  # Doubled from 3.0
 var lost_player_timer: float = 0.0
 var lost_player_duration: float = 2.5  # Time spent confused before giving up
 
@@ -80,6 +94,7 @@ var players_hit_this_dash: Array[Node] = []
 
 # References
 @onready var sprite: AnimatedSprite2D = $Sprite
+@onready var eye_sprite: AnimatedSprite2D = $EyeSprite
 @onready var stance_label: Label = $StanceLabel
 @onready var health_bar: ProgressBar = $HealthBar
 @onready var defense_point_label: Label = $DefensePoint
@@ -128,7 +143,7 @@ signal enemy_attack(attacker_stance: Stance, attack_position: Vector2)
 signal enemy_defense_points_changed(current_defense: int, max_defense: int)
 
 func load_enemy_data():
-	"""Load variables from EnemyData resource or create default values"""
+	# Load variables from EnemyData resource or create default values
 	
 	# Create default data if no resource assigned
 	if not enemy_data:
@@ -143,14 +158,14 @@ func load_enemy_data():
 	apply_enemy_data()
 
 func create_default_enemy_data() -> EnemyData:
-	"""Create default EnemyData if none assigned"""
+	# Create default EnemyData if none assigned
 	var data = EnemyData.new()
 	data.enemy_name = "Default Enemy"
 	# All other values will use the defaults from EnemyData.gd
 	return data
 
 func apply_collision_settings():
-	"""Apply collision settings from enemy data to the actual collision shapes"""
+	# Apply collision settings from enemy data to the actual collision shapes
 	# Apply body collision size
 	var body_collision = get_node("CollisionShape2D")
 	if body_collision and body_collision.shape is RectangleShape2D:
@@ -165,54 +180,77 @@ func apply_collision_settings():
 		attack_collision.scale = enemy_data.attack_collision_scale
 
 func apply_visual_data():
-	"""Apply visual customization from enemy data with animations"""
+	# Apply visual customization from enemy data with dual sprite animations
 	if not enemy_data:
 		return
 	
-	# Get animated sprite node
+	# Get both animated sprite nodes
 	var sprite_node = get_node("Sprite") as AnimatedSprite2D
+	var eye_sprite_node = get_node("EyeSprite") as AnimatedSprite2D
+	
 	if not sprite_node:
-		print("ERROR: No AnimatedSprite2D node found for visual data application")
+		print("ERROR: No base AnimatedSprite2D node found")
 		return
 	
-	# Create SpriteFrames resource with animations
-	setup_enemy_animations(sprite_node)
+	if not eye_sprite_node:
+		print("ERROR: No EyeSprite AnimatedSprite2D node found")
+		return
 	
-	# Apply scale
+	# Create SpriteFrames for base sprite (idle, walk only)
+	setup_base_animations(sprite_node)
+	
+	# Create SpriteFrames for eye sprite (walk_eye only)
+	setup_eye_animations(eye_sprite_node)
+	
+	# Apply scale to both sprites
 	sprite_node.scale = enemy_data.sprite_scale
+	eye_sprite_node.scale = enemy_data.sprite_scale
 	
-	# Start with idle animation
-	sprite_node.play("idle")
-	
-	# Apply color tint
+	# Apply color tint to both sprites
 	sprite_node.modulate = enemy_data.color_tint
+	eye_sprite_node.modulate = enemy_data.color_tint
 	
-	print("Applied visual data - Scale: ", enemy_data.sprite_scale, " Tint: ", enemy_data.color_tint)
-	print("DEBUG: Final sprite scale after application: ", sprite_node.scale)
-	print("DEBUG: Sprite frames assigned: ", sprite_node.sprite_frames != null)
-	print("DEBUG: Current animation: ", sprite_node.animation)
+	# Start both with appropriate animations
+	sprite_node.play("idle")
+	eye_sprite_node.play("walk_eye")
+	eye_sprite_node.visible = false  # Start hidden
+	
+	# Visual data applied successfully
 
-func setup_enemy_animations(sprite_node: AnimatedSprite2D):
-	"""Create SpriteFrames resource with idle, walk, and walk_eye animations"""
+func setup_base_animations(sprite_node: AnimatedSprite2D):
+	# Create SpriteFrames for base sprite (idle, walk animations only)
 	var sprite_frames = SpriteFrames.new()
 	
-	# Load the three animation spritesheets
+	# Load base animation spritesheets
 	var idle_texture = preload("res://assets/assets_game/enemy_idle.png")
 	var walk_texture = preload("res://assets/assets_game/enemy_walk.png")
-	var walk_eye_texture = preload("res://assets/assets_game/enemy_walking_eye.png")
 	
 	# Add animations to SpriteFrames
 	add_spritesheet_frames(sprite_frames, "idle", idle_texture, 64, 64)
 	add_spritesheet_frames(sprite_frames, "walk", walk_texture, 64, 64)
-	add_spritesheet_frames(sprite_frames, "walk_eye", walk_eye_texture, 64, 64)
 	
-	# Apply the SpriteFrames to the AnimatedSprite2D
+	# Apply the SpriteFrames to the base sprite
 	sprite_node.sprite_frames = sprite_frames
 	
-	print("Enemy animations setup complete: idle, walk, walk_eye")
+	# Base animations ready
+
+func setup_eye_animations(eye_sprite_node: AnimatedSprite2D):
+	# Create SpriteFrames for eye sprite (walk_eye animation only)
+	var sprite_frames = SpriteFrames.new()
+	
+	# Load eye animation spritesheet
+	var walk_eye_texture = preload("res://assets/assets_game/enemy_walking_eye.png")
+	
+	# Add eye animation to SpriteFrames
+	add_spritesheet_frames(sprite_frames, "enemy_eye", walk_eye_texture, 64, 64)
+	
+	# Apply the SpriteFrames to the eye sprite
+	eye_sprite_node.sprite_frames = sprite_frames
+	
+	# Eye animations ready
 
 func add_spritesheet_frames(sprite_frames: SpriteFrames, animation_name: String, texture: Texture2D, frame_width: int, frame_height: int):
-	"""Extract frames from a spritesheet and add them to SpriteFrames"""
+	# Extract frames from a spritesheet and add them to SpriteFrames
 	if not texture:
 		print("ERROR: No texture provided for animation: ", animation_name)
 		return
@@ -226,8 +264,7 @@ func add_spritesheet_frames(sprite_frames: SpriteFrames, animation_name: String,
 	var frames_x = texture_width / frame_width
 	var frames_y = texture_height / frame_height
 	
-	print("DEBUG: ", animation_name, " texture size: ", texture_width, "x", texture_height)
-	print("DEBUG: Expected frames: ", frames_x, "x", frames_y, " (", frames_x * frames_y, " total)")
+	# Animation setup: frames_x × frames_y
 	
 	# Extract each frame
 	for y in frames_y:
@@ -244,10 +281,10 @@ func add_spritesheet_frames(sprite_frames: SpriteFrames, animation_name: String,
 	sprite_frames.set_animation_speed(animation_name, 8.0)  # 8 FPS
 	sprite_frames.set_animation_loop(animation_name, true)
 	
-	print("Added ", frames_x * frames_y, " frames for animation: ", animation_name)
+	# Animation frames loaded successfully
 
 func apply_enemy_data():
-	"""Apply enemy data to all relevant systems"""
+	# Apply enemy data to all relevant systems
 	if not enemy_data:
 		return
 	
@@ -289,8 +326,18 @@ func apply_enemy_data():
 
 
 func _ready():
+	print("=== ENEMY INITIALIZATION DEBUG ===")
+	
+	# Debug: Check scene node structure
+	print("Sprite node: ", $Sprite if has_node("Sprite") else "MISSING!")
+	print("EyeSprite node: ", $EyeSprite if has_node("EyeSprite") else "MISSING!")
+	
 	# Initialize audio manager
 	audio_manager = AudioManager.new()
+	
+	# Initialize rotation tween (like player)
+	rotation_tween = create_tween()
+	rotation_tween.kill()  # Stop it initially
 	
 	# Load enemy data from resource
 	if enemy_data:
@@ -305,6 +352,14 @@ func _ready():
 		dash_preview.set_enemy_style()
 	
 	update_visual()
+	
+	# Final debug check
+	print("Final sprite reference: ", sprite)
+	print("Final eye_sprite reference: ", eye_sprite)
+	print("Sprite visible: ", sprite.visible if sprite else "N/A")
+	print("Eye visible: ", eye_sprite.visible if eye_sprite else "N/A")
+	print("=== ENEMY INITIALIZATION COMPLETE ===")
+	
 	# Setup vision casting (no signal connections needed for raycasting)
 	if vision_cast:
 		vision_cast.collision_mask = enemy_data.vision_collision_mask if enemy_data else 2
@@ -380,7 +435,13 @@ func update_ai(delta):
 	# Note: All movement functions now enforce neutral stance restriction like player
 	match current_state:
 		AIState.IDLE:
-			velocity = Vector2.ZERO
+			# Smooth deceleration to stop
+			current_speed = move_toward(current_speed, 0.0, deceleration * delta)
+			if velocity.length() > 0 and current_speed > 0:
+				velocity = velocity.normalized() * current_speed
+			else:
+				velocity = Vector2.ZERO
+			
 			current_stance = Stance.NEUTRAL
 			# Hide any lingering indicators
 			hide_all_indicators()
@@ -457,9 +518,11 @@ func update_ai(delta):
 					stance_decision_timer = 0.3  # Time to decide stance
 					# Debug logging for Enemy 1
 					if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
-						print("AI STATE [%s]: POSITIONING → STANCE_SELECTION (distance: %.1f, attack_range: %.1f, attack_timer: %.1f)" % [enemy_data.enemy_name, distance, attack_range, attack_timer])
+						# Debug: Entering stance selection
+						pass
 				elif enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
-					print("AI STATE [%s]: POSITIONING waiting (distance: %.1f > %.1f OR attack_timer: %.1f > 0)" % [enemy_data.enemy_name, distance, attack_range * 1.5, attack_timer])
+					# Debug: Positioning, waiting for attack window
+					pass
 			
 		AIState.STANCE_SELECTION:
 			# Stop moving and select counter-stance
@@ -471,7 +534,8 @@ func update_ai(delta):
 				current_state = AIState.ATTACKING
 				# Debug logging for Enemy 1
 				if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
-					print("AI STATE [%s]: STANCE_SELECTION → ATTACKING (stance: %s, dash_delay: %.1f)" % [enemy_data.enemy_name, Stance.keys()[current_stance], stance_to_dash_timer])
+					# Debug: Starting attack with selected stance
+					pass
 			
 		AIState.ATTACKING:
 			# Show dash trajectory to target position
@@ -551,17 +615,31 @@ func handle_walking_movement():
 		if randf() < 0.4:
 			current_state = AIState.IDLE
 			idle_timer = randf_range(idle_duration_min, idle_duration_max)
-			velocity = Vector2.ZERO
+			# Start deceleration when going idle
+			current_speed = 0.0
 			return
 		else:
 			pick_new_walking_direction()
 			walking_timer = direction_change_interval + randf_range(-0.5, 0.5)  # Add some randomness
 	
-	# Move in the current walking direction
-	velocity = walking_direction * walking_speed
-	# Update facing direction based on movement
+	# Smooth movement with acceleration/deceleration
 	if walking_direction.length() > 0.1:
-		facing_direction = walking_direction.normalized()
+		# Accelerate toward walking speed
+		var target_speed = walking_speed
+		current_speed = move_toward(current_speed, target_speed, acceleration * get_process_delta_time())
+		velocity = walking_direction.normalized() * current_speed
+		
+		# Update facing direction gradually based on movement
+		if velocity.length() > 0.1:
+			var target_facing = velocity.normalized()
+			facing_direction = facing_direction.lerp(target_facing, 3.0 * get_process_delta_time()).normalized()
+	else:
+		# Decelerate when no direction
+		current_speed = move_toward(current_speed, 0.0, deceleration * get_process_delta_time())
+		if velocity.length() > 0 and current_speed > 0:
+			velocity = velocity.normalized() * current_speed
+		else:
+			velocity = Vector2.ZERO
 
 func pick_new_walking_direction():
 	# Pick a random direction
@@ -593,7 +671,7 @@ func observe_player():
 		# Track player's stance changes
 		if player_ref.current_stance != last_player_stance:
 			last_player_stance = player_ref.current_stance
-			print("Enemy observed player change to: ", Player.Stance.keys()[last_player_stance])
+			# Debug: Player stance change observed
 
 func position_tactically():
 	if player_ref:
@@ -609,13 +687,16 @@ func position_tactically():
 		if distance > attack_range * 1.2:
 			# Move closer
 			velocity = direction * speed
+			print("DEBUG: POSITIONING - Moving closer to player, velocity: ", velocity)
 		elif distance < attack_range * 0.8:
 			# Move away to optimal distance
 			velocity = -direction * speed * 0.7
+			print("DEBUG: POSITIONING - Moving away from player, velocity: ", velocity)
 		else:
 			# Circle around player to find good attack angle
 			var perpendicular = Vector2(-direction.y, direction.x)
 			velocity = perpendicular * speed * 0.5
+			print("DEBUG: POSITIONING - Circling around player, velocity: ", velocity)
 
 func select_tactical_stance():
 	if player_ref:
@@ -638,8 +719,8 @@ func select_tactical_stance():
 		current_stance = select_weighted_stance()
 		
 		update_visual()
-		print("Enemy selected ", Stance.keys()[current_stance], " to counter player's ", Player.Stance.keys()[player_stance])
-		print("Target locked at position: ", target_attack_position)
+		# Debug: Stance selection complete
+		# Debug: Target position locked
 
 func chase_player():
 	if player_ref:
@@ -650,6 +731,7 @@ func chase_player():
 			
 		var direction = (player_ref.global_position - global_position).normalized()
 		velocity = direction * speed
+		print("DEBUG: CHASING - Moving toward player, velocity: ", velocity)
 
 func retreat_from_player():
 	if player_ref:
@@ -733,7 +815,7 @@ func perform_dash_attack():
 		
 		# Emit attack signal
 		enemy_attack.emit(current_stance, global_position)
-		print("Enemy dash attacks with: ", Stance.keys()[current_stance], " towards stored target position")
+		# Debug: Dash attack initiated
 
 func attack_during_dash():
 	# DEBUG: Add comprehensive logging
@@ -973,7 +1055,7 @@ func take_damage_from_player(player_stance, attack_position: Vector2, is_mutual_
 		if player_ref and player_ref.has_method("apply_stun"):
 			player_ref.apply_stun()
 	
-	print("Combat: Player ", Player.Stance.keys()[player_stance], " vs Enemy ", Stance.keys()[current_stance], " - Damage: ", damage, " - ", result)
+	# Debug: Combat result calculated
 
 func spawn_damage_number(amount: int):
 	# Load and spawn damage number scene for enemy taking damage (blue numbers)
@@ -1032,10 +1114,11 @@ func take_damage(amount: int):
 		# Brief stun when taking damage
 		current_state = AIState.STUNNED
 		var stun_timer = create_tween()
-		stun_timer.tween_callback(func(): 
-			current_state = AIState.RETREATING
-			retreat_timer = 1.0
-		).set_delay(0.5)
+		stun_timer.tween_callback(func(): _set_retreating_state()).set_delay(0.5)
+
+func _set_retreating_state():
+	current_state = AIState.RETREATING
+	retreat_timer = 1.0
 
 func update_timers(delta):
 	# Update attack cooldown in all states for responsive combat
@@ -1102,25 +1185,179 @@ func update_timers(delta):
 		alert_timer -= delta
 
 func update_visual():
-	# Update animation based on AI state and movement
+	# Debug: Show current state and velocity
+	if velocity.length() > 1.0:  # Only when moving
+		print("DEBUG: update_visual - State: ", AIState.keys()[current_state], " Velocity: ", velocity.length(), " Animation: ", current_animation_state)
+	
+	# Handle stance-based sprite display only during stance selection and pre-attack phase
+	if current_stance != Stance.NEUTRAL and current_state == AIState.STANCE_SELECTION:
+		# Show stance-specific static sprite during stance selection only
+		show_stance_sprite()
+		# Hide eye sprite during stance display (base sprite shows stance)
+		if eye_sprite:
+			eye_sprite.visible = false
+	else:
+		# Show animated sprites in all other cases (including ATTACKING with neutral stance)
+		restore_animated_sprites()
+		# Handle normal animation and eye sprite logic
+		update_animated_sprites()
+	
+	# Apply smooth rotation to visible sprites based on movement direction
+	apply_sprite_rotation()
+	
+	# stance_label.text = stance_symbols[current_stance]  # Disabled stance emoji display
+	update_health_bar()
+	update_defense_point_visual()
+
+func update_animated_sprites():
+	# Update base sprite animation and track animation state
 	if sprite and sprite.sprite_frames:
 		match current_state:
 			AIState.IDLE, AIState.STUNNED, AIState.POSITIONING, AIState.STANCE_SELECTION:
 				if sprite.animation != "idle":
 					sprite.play("idle")
-			AIState.WALKING, AIState.LOST_PLAYER, AIState.RETREATING:
+				current_animation_state = "idle"
+			AIState.WALKING, AIState.LOST_PLAYER, AIState.RETREATING, AIState.ATTACKING:
 				if sprite.animation != "walk":
 					sprite.play("walk")
+				current_animation_state = "walking"
 			AIState.ALERT, AIState.OBSERVING:
-				if sprite.animation != "walk_eye":
-					sprite.play("walk_eye")
-			AIState.ATTACKING:
-				# Keep current animation during attack
-				pass
+				# Base sprite still shows walk animation
+				if sprite.animation != "walk":
+					sprite.play("walk")
+				current_animation_state = "walking"
 	
-	# stance_label.text = stance_symbols[current_stance]  # Disabled stance emoji display
-	update_health_bar()
-	update_defense_point_visual()
+	# Control eye sprite visibility and animation
+	if eye_sprite:
+		if eye_sprite.sprite_frames:
+			match current_state:
+				AIState.WALKING, AIState.IDLE:
+					# Show eye overlay during walking and idle states
+					eye_sprite.visible = true
+					if eye_sprite.animation != "enemy_eye":
+						eye_sprite.play("enemy_eye")
+				AIState.ALERT, AIState.OBSERVING:
+					# Show eye overlay during alert states
+					eye_sprite.visible = true
+					if eye_sprite.animation != "enemy_eye":
+						eye_sprite.play("enemy_eye")
+				AIState.ATTACKING, AIState.RETREATING:
+					# Show eye overlay during attacking and retreating (when not showing stance sprite)
+					eye_sprite.visible = true
+					if eye_sprite.animation != "enemy_eye":
+						eye_sprite.play("enemy_eye")
+				_:
+					# Hide eye overlay only in stance selection and stunned states
+					eye_sprite.visible = false
+		else:
+			# Eye sprite needs sprite_frames setup - try to set it up now
+			setup_eye_animations(eye_sprite)
+	else:
+		pass  # Eye sprite node not found
+
+func show_stance_sprite():
+	# Create SpriteFrames with stance texture for AnimatedSprite2D compatibility
+	var stance_texture: Texture2D
+	match current_stance:
+		Stance.ROCK:
+			stance_texture = preload("res://assets/test_sprites/rock_enemy.png")
+		Stance.PAPER:
+			stance_texture = preload("res://assets/test_sprites/paper_enemy.png")
+		Stance.SCISSORS:
+			stance_texture = preload("res://assets/test_sprites/scissor_enemy.png")
+	
+	if stance_texture and sprite:
+		# Create temporary SpriteFrames with single frame for stance display
+		var stance_sprite_frames = SpriteFrames.new()
+		stance_sprite_frames.add_animation("stance")
+		stance_sprite_frames.add_frame("stance", stance_texture)
+		stance_sprite_frames.set_animation_loop("stance", false)
+		
+		# Apply stance SpriteFrames
+		sprite.sprite_frames = stance_sprite_frames
+		sprite.animation = "stance"
+		sprite.frame = 0
+		sprite.visible = true
+
+func restore_animated_sprites():
+	# Restore sprite frames for animations when returning to neutral
+	if sprite:
+		setup_base_animations(sprite)  # Restore animation frames
+		sprite.visible = true
+	
+	if eye_sprite:
+		setup_eye_animations(eye_sprite)  # Restore eye animations
+		# Ensure eye sprite is visible and ready for state-based control
+		eye_sprite.visible = true
+
+func apply_sprite_rotation():
+	# Debug: Always show rotation attempt
+	if velocity.length() > movement_threshold:
+		print("DEBUG: Rotation check - anim_state: ", current_animation_state, " velocity: ", velocity.length(), " threshold: ", movement_threshold)
+	
+	# Apply rotation during ANY movement with sufficient velocity (not just walking state)
+	if velocity.length() > movement_threshold:
+		# Check if sprite exists
+		if not sprite:
+			print("ERROR: sprite is null during rotation!")
+			return
+			
+		var movement_angle = velocity.angle()
+		
+		# Debug: Show angle calculations and expected direction
+		var direction_name = ""
+		if abs(velocity.x) > abs(velocity.y):
+			direction_name = "RIGHT" if velocity.x > 0 else "LEFT"
+		else:
+			direction_name = "UP" if velocity.y < 0 else "DOWN"
+		
+		print("DEBUG: Moving ", direction_name, " - Velocity: ", velocity, " Raw angle: ", rad_to_deg(movement_angle), "°")
+		
+		# Test different rotation calculations
+		var option1 = rad_to_deg(movement_angle)      # No offset
+		var option2 = rad_to_deg(movement_angle) + 90 # Current 
+		var option3 = rad_to_deg(movement_angle) - 90 # Reverse
+		var option4 = rad_to_deg(-movement_angle)     # Negative angle
+		
+		print("DEBUG: Options - No offset: ", option1, "° | +90: ", option2, "° | -90: ", option3, "° | Negative: ", option4, "°")
+		
+		# Use current formula for now
+		var target_rotation_degrees = option2
+		
+		# Store the current movement direction for stance preservation (like player)
+		last_movement_direction = target_rotation_degrees
+		
+		# Use shortest angle path for smooth rotation transition (like player)
+		var angle_diff = get_shortest_angle_difference(sprite.rotation_degrees, target_rotation_degrees)
+		if abs(angle_diff) > 5:  # Only rotate if significant change (like player)
+			# Use normalized target to force short path in tween (like player)
+			var normalized_target = sprite.rotation_degrees + angle_diff
+			current_rotation = target_rotation_degrees  # Update tracking variable
+			if rotation_tween:
+				rotation_tween.kill()
+			rotation_tween = create_tween()
+			rotation_tween.tween_property(sprite, "rotation_degrees", normalized_target, 0.2)
+			
+			# Sync eye sprite rotation with main sprite
+			sync_eye_sprite_rotation()
+			
+			# Debug rotation
+			print("DEBUG: Enemy rotating - velocity: ", velocity, " target: ", target_rotation_degrees, "°")
+	# Note: Enemy now rotates during ANY movement (positioning, chasing, retreating, etc.)
+
+func sync_eye_sprite_rotation():
+	# Sync eye sprite rotation with main sprite (like player)
+	if eye_sprite and sprite:
+		eye_sprite.rotation_degrees = sprite.rotation_degrees
+
+func get_shortest_angle_difference(current_angle: float, target_angle: float) -> float:
+	# Calculate shortest path between angles (like player)
+	var diff = target_angle - current_angle
+	while diff > 180:
+		diff -= 360
+	while diff < -180:
+		diff += 360
+	return diff
 
 func update_health_bar():
 	var health_percent = float(current_health) / float(max_health) * 100.0
@@ -1336,7 +1573,7 @@ func reset_detection_range():
 	queue_redraw()
 
 func can_see_player() -> bool:
-	"""Vision-based detection using raycasting and field of view"""
+	# Vision-based detection using raycasting and field of view
 	# Get player reference if we don't have one
 	if not player_ref:
 		player_ref = get_tree().get_first_node_in_group("player")
@@ -1391,7 +1628,7 @@ func can_see_player() -> bool:
 	return true
 
 func update_vision_detection():
-	"""Update vision-based player detection"""
+	# Update vision-based player detection
 	# Check for instant detection first
 	if enemy_data and enemy_data.instant_detection:
 		check_instant_detection()
@@ -1422,7 +1659,7 @@ func update_vision_detection():
 			_handle_player_lost()
 
 func check_instant_detection():
-	"""Instant detection system - detects player immediately within detection_radius"""
+	# Instant detection system - detects player immediately within detection_radius
 	if not player_ref:
 		player_ref = get_tree().get_first_node_in_group("player")
 	
@@ -1437,19 +1674,22 @@ func check_instant_detection():
 			# Player is within instant detection range
 			if current_state in [AIState.IDLE, AIState.WALKING]:
 				if debug_enemy:
-					print("INSTANT DETECTION [%s]: Player detected at distance %.1f (max: %.1f)" % [enemy_data.enemy_name, distance_to_player, detection_radius])
+					# Debug: Instant detection successful
+					pass
 				_handle_player_detected()
 			elif debug_enemy:
-				print("INSTANT DETECTION [%s]: Player in range but enemy busy (state: %s)" % [enemy_data.enemy_name, AIState.keys()[current_state]])
+				# Debug: Enemy busy during detection
+				pass
 		else:
 			# Player is outside detection radius
 			if debug_enemy:
-				print("INSTANT DETECTION [%s]: Player too far %.1f > %.1f" % [enemy_data.enemy_name, distance_to_player, detection_radius])
+				# Debug: Player out of detection range
+				pass
 			if player_ref:
 				_handle_player_lost()
 
 func _handle_player_detected():
-	"""Handle when player is detected via vision"""
+	# Handle when player is detected via vision
 	# Debug logging for Enemy 1
 	if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
 		print("_HANDLE_PLAYER_DETECTED [%s]: Current state = %s, instant_detection = %s" % [enemy_data.enemy_name, AIState.keys()[current_state], enemy_data.instant_detection])
@@ -1490,7 +1730,7 @@ func _handle_player_detected():
 		print("Enemy detected player - entering tactical mode")
 
 func _handle_player_lost():
-	"""Handle when player is lost from vision"""
+	# Handle when player is lost from vision
 	# Don't interrupt if enemy is in attacking state (committed to attack)
 	if current_state != AIState.ATTACKING:
 		player_ref = null
@@ -1514,23 +1754,26 @@ func _handle_player_lost():
 			# print("Enemy lost sight of player (returning to patrol)")
 
 func update_enemy_dash_preview():
-	# Show simple trajectory line from enemy position to target when attacking
+	# Show simple trajectory line from enemy position to target when attacking (but hide during actual dash)
 	if not dash_preview:
 		return
-		
-	# Show trajectory only in ATTACKING state with a stance selected
-	if current_state == AIState.ATTACKING and current_stance != Stance.NEUTRAL and player_ref:
+	
+	# Show trajectory only during ATTACKING state charge-up, hide when actually dashing
+	if current_state == AIState.ATTACKING and current_stance != Stance.NEUTRAL and player_ref and not is_dashing:
 		# Calculate direction to target and apply consistent dash distance
 		var direction_to_target = (target_attack_position - global_position).normalized()
 		var enemy_dash_distance = dash_speed * dash_duration  # 300 * 0.6 = 180 pixels
 		var relative_target = direction_to_target * enemy_dash_distance
 		dash_preview.show_simple_dash_line(relative_target)
-		# Debug: Show exact positions
-		if stance_to_dash_timer > stance_to_dash_delay * 0.8:  # Only print early in attack phase
-			print("ENEMY: Dash line relative vector: ", relative_target, " (consistent distance: ", enemy_dash_distance, "px)")
+		# Debug: Showing dash preview during charge-up (reduced spam)
+		if fmod(Time.get_time_dict_from_system()["second"], 1.0) < 0.1:  # Only print occasionally
+			print("DEBUG: Showing dash line - State: ATTACKING, Stance: ", current_stance, ", is_dashing: ", is_dashing)
 	else:
-		# Hide trajectory if not in attacking state
+		# Hide trajectory if not charging attack or if currently dashing
 		dash_preview.hide_dash_trajectory()
+		# Debug: Hiding dash preview
+		if current_state == AIState.ATTACKING:
+			print("DEBUG: Hiding dash line - State: ATTACKING, is_dashing: ", is_dashing, ", stance: ", current_stance)
 
 func add_immunity_visual_feedback():
 	# Create flickering effect during immunity frames
@@ -1560,7 +1803,7 @@ func _on_attack_area_body_entered(body):
 	pass
 
 func select_weighted_stance() -> Stance:
-	"""Select stance based on CSV probability weights"""
+	# Select stance based on CSV probability weights
 	if not enemy_data:
 		# Fallback to random if no data
 		var stances = [Stance.NEUTRAL, Stance.ROCK, Stance.PAPER, Stance.SCISSORS]

@@ -56,7 +56,7 @@ func _ready():
 	initialize_hearts(player.max_health if player else 5)
 	
 	# Spawn first enemy from resource system
-	spawn_enemy_by_resource("BasicEnemy")
+	spawn_enemy_by_resource("BasicBalancedEnemy")
 	
 	# Initialize enemy database manager
 	var db_manager = EnemyDatabaseManager.new()

@@ -13,7 +13,11 @@
       "Bash(afplay:*)",
       "Bash(powershell.exe:*)",
       "Bash(timeout:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(awk:*)",
+      "Bash(python3:*)",
+      "Bash(sed:*)",
+      "Bash(gdscript:*)"
     ],
     "deny": []
   }
