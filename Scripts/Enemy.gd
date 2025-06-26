@@ -68,6 +68,10 @@ var last_movement_direction: float = 0.0
 var current_animation_state: String = "idle"
 var movement_threshold: float = 5.0  # Minimum velocity for rotation
 
+# Debug output control
+var debug_timer: float = 0.0
+var debug_interval: float = 0.2  # Print debug every 0.2 seconds
+
 # Idle and lost player state variables
 var idle_timer: float = 0.0
 var idle_duration_min: float = 2.0  # Doubled from 1.0
@@ -622,12 +626,13 @@ func handle_walking_movement():
 			pick_new_walking_direction()
 			walking_timer = direction_change_interval + randf_range(-0.5, 0.5)  # Add some randomness
 	
-	# Smooth movement with acceleration/deceleration
+	# Smooth movement with acceleration/deceleration and integrated rotation
 	if walking_direction.length() > 0.1:
 		# Accelerate toward walking speed
 		var target_speed = walking_speed
 		current_speed = move_toward(current_speed, target_speed, acceleration * get_process_delta_time())
-		velocity = walking_direction.normalized() * current_speed
+		var new_velocity = walking_direction.normalized() * current_speed
+		apply_movement_with_rotation(new_velocity)
 		
 		# Update facing direction gradually based on movement
 		if velocity.length() > 0.1:
@@ -637,9 +642,9 @@ func handle_walking_movement():
 		# Decelerate when no direction
 		current_speed = move_toward(current_speed, 0.0, deceleration * get_process_delta_time())
 		if velocity.length() > 0 and current_speed > 0:
-			velocity = velocity.normalized() * current_speed
+			apply_movement_with_rotation(velocity.normalized() * current_speed)
 		else:
-			velocity = Vector2.ZERO
+			apply_movement_with_rotation(Vector2.ZERO)
 
 func pick_new_walking_direction():
 	# Pick a random direction
@@ -677,7 +682,7 @@ func position_tactically():
 	if player_ref:
 		# Only move if in neutral stance (like player)
 		if current_stance != Stance.NEUTRAL:
-			velocity = Vector2.ZERO
+			apply_movement_with_rotation(Vector2.ZERO)
 			return
 			
 		var distance = global_position.distance_to(player_ref.global_position)
@@ -685,18 +690,15 @@ func position_tactically():
 		
 		# Try to maintain optimal distance - close enough to attack, far enough to retreat
 		if distance > attack_range * 1.2:
-			# Move closer
-			velocity = direction * speed
-			print("DEBUG: POSITIONING - Moving closer to player, velocity: ", velocity)
+			# Move closer with integrated rotation
+			apply_movement_with_rotation(direction * speed)
 		elif distance < attack_range * 0.8:
-			# Move away to optimal distance
-			velocity = -direction * speed * 0.7
-			print("DEBUG: POSITIONING - Moving away from player, velocity: ", velocity)
+			# Move away to optimal distance with integrated rotation
+			apply_movement_with_rotation(-direction * speed * 0.7)
 		else:
-			# Circle around player to find good attack angle
+			# Circle around player to find good attack angle with integrated rotation
 			var perpendicular = Vector2(-direction.y, direction.x)
-			velocity = perpendicular * speed * 0.5
-			print("DEBUG: POSITIONING - Circling around player, velocity: ", velocity)
+			apply_movement_with_rotation(perpendicular * speed * 0.5)
 
 func select_tactical_stance():
 	if player_ref:
@@ -726,22 +728,21 @@ func chase_player():
 	if player_ref:
 		# Only move if in neutral stance (like player)
 		if current_stance != Stance.NEUTRAL:
-			velocity = Vector2.ZERO
+			apply_movement_with_rotation(Vector2.ZERO)
 			return
 			
 		var direction = (player_ref.global_position - global_position).normalized()
-		velocity = direction * speed
-		print("DEBUG: CHASING - Moving toward player, velocity: ", velocity)
+		apply_movement_with_rotation(direction * speed)
 
 func retreat_from_player():
 	if player_ref:
 		# Only move if in neutral stance (like player)
 		if current_stance != Stance.NEUTRAL:
-			velocity = Vector2.ZERO
+			apply_movement_with_rotation(Vector2.ZERO)
 			return
 			
 		var direction = (global_position - player_ref.global_position).normalized()
-		velocity = direction * speed * 0.8
+		apply_movement_with_rotation(direction * speed * 0.8)
 
 func handle_dash_movement(delta):
 	# No dash movement allowed when stunned
@@ -1121,6 +1122,12 @@ func _set_retreating_state():
 	retreat_timer = 1.0
 
 func update_timers(delta):
+	# Update debug timer for controlled output
+	debug_timer += delta
+	if debug_timer >= debug_interval:
+		debug_timer = 0.0
+		print_enemy_status_debug()
+	
 	# Update attack cooldown in all states for responsive combat
 	if attack_timer > 0:
 		attack_timer -= delta
@@ -1202,8 +1209,7 @@ func update_visual():
 		# Handle normal animation and eye sprite logic
 		update_animated_sprites()
 	
-	# Apply smooth rotation to visible sprites based on movement direction
-	apply_sprite_rotation()
+	# Rotation is now integrated with movement functions
 	
 	# stance_label.text = stance_symbols[current_stance]  # Disabled stance emoji display
 	update_health_bar()
@@ -1290,49 +1296,33 @@ func restore_animated_sprites():
 		# Ensure eye sprite is visible and ready for state-based control
 		eye_sprite.visible = true
 
-func apply_sprite_rotation():
-	# Debug: Always show rotation attempt
-	if velocity.length() > movement_threshold:
-		print("DEBUG: Rotation check - anim_state: ", current_animation_state, " velocity: ", velocity.length(), " threshold: ", movement_threshold)
+# Old separate rotation function removed - rotation is now integrated with movement
+
+func sync_eye_sprite_rotation():
+	# Sync eye sprite rotation with main sprite (like player)
+	if eye_sprite and sprite:
+		eye_sprite.rotation_degrees = sprite.rotation_degrees
+
+func apply_movement_with_rotation(new_velocity: Vector2):
+	# Integrated movement and rotation system (like player)
+	velocity = new_velocity
 	
-	# Apply rotation during ANY movement with sufficient velocity (not just walking state)
+	# Apply rotation immediately if movement is significant
 	if velocity.length() > movement_threshold:
-		# Check if sprite exists
 		if not sprite:
-			print("ERROR: sprite is null during rotation!")
 			return
 			
 		var movement_angle = velocity.angle()
+		var target_rotation_degrees = rad_to_deg(movement_angle) + 90  # Start at 90 degrees as requested
 		
-		# Debug: Show angle calculations and expected direction
-		var direction_name = ""
-		if abs(velocity.x) > abs(velocity.y):
-			direction_name = "RIGHT" if velocity.x > 0 else "LEFT"
-		else:
-			direction_name = "UP" if velocity.y < 0 else "DOWN"
-		
-		print("DEBUG: Moving ", direction_name, " - Velocity: ", velocity, " Raw angle: ", rad_to_deg(movement_angle), "°")
-		
-		# Test different rotation calculations
-		var option1 = rad_to_deg(movement_angle)      # No offset
-		var option2 = rad_to_deg(movement_angle) + 90 # Current 
-		var option3 = rad_to_deg(movement_angle) - 90 # Reverse
-		var option4 = rad_to_deg(-movement_angle)     # Negative angle
-		
-		print("DEBUG: Options - No offset: ", option1, "° | +90: ", option2, "° | -90: ", option3, "° | Negative: ", option4, "°")
-		
-		# Use current formula for now
-		var target_rotation_degrees = option2
-		
-		# Store the current movement direction for stance preservation (like player)
+		# Store the current movement direction for stance preservation
 		last_movement_direction = target_rotation_degrees
 		
-		# Use shortest angle path for smooth rotation transition (like player)
+		# Use shortest angle path for smooth rotation transition
 		var angle_diff = get_shortest_angle_difference(sprite.rotation_degrees, target_rotation_degrees)
-		if abs(angle_diff) > 5:  # Only rotate if significant change (like player)
-			# Use normalized target to force short path in tween (like player)
+		if abs(angle_diff) > 5:  # Only rotate if significant change
 			var normalized_target = sprite.rotation_degrees + angle_diff
-			current_rotation = target_rotation_degrees  # Update tracking variable
+			current_rotation = target_rotation_degrees
 			if rotation_tween:
 				rotation_tween.kill()
 			rotation_tween = create_tween()
@@ -1340,15 +1330,6 @@ func apply_sprite_rotation():
 			
 			# Sync eye sprite rotation with main sprite
 			sync_eye_sprite_rotation()
-			
-			# Debug rotation
-			print("DEBUG: Enemy rotating - velocity: ", velocity, " target: ", target_rotation_degrees, "°")
-	# Note: Enemy now rotates during ANY movement (positioning, chasing, retreating, etc.)
-
-func sync_eye_sprite_rotation():
-	# Sync eye sprite rotation with main sprite (like player)
-	if eye_sprite and sprite:
-		eye_sprite.rotation_degrees = sprite.rotation_degrees
 
 func get_shortest_angle_difference(current_angle: float, target_angle: float) -> float:
 	# Calculate shortest path between angles (like player)
@@ -1358,6 +1339,18 @@ func get_shortest_angle_difference(current_angle: float, target_angle: float) ->
 	while diff < -180:
 		diff += 360
 	return diff
+
+func print_enemy_status_debug():
+	# Controlled debug output every 0.2 seconds (only when moving or in combat)
+	var should_debug = velocity.length() > 1.0 or current_state != AIState.WALKING
+	if should_debug:
+		var rotation_value = sprite.rotation_degrees if sprite else 0.0
+		print("=== ENEMY STATUS DEBUG ===")
+		print("State: ", AIState.keys()[current_state])
+		print("Position: ", global_position)
+		print("Velocity: ", velocity, " (magnitude: ", velocity.length(), ")")
+		print("Current Rotation: ", rotation_value, "°")
+		print("==========================")
 
 func update_health_bar():
 	var health_percent = float(current_health) / float(max_health) * 100.0
