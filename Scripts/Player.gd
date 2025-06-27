@@ -157,8 +157,7 @@ func _ready():
 	# Connect animation finished signal for long idle
 	sprite.animation_finished.connect(_on_animation_finished)
 	
-	# Debug initial long idle values
-	# print("DEBUG: Long idle system initialized - delay: ", long_idle_delay, " is_in_long_idle: ", is_in_long_idle)
+	# Long idle system initialized
 	
 func _physics_process(delta):
 	handle_movement(delta)
@@ -288,14 +287,12 @@ func handle_movement(delta):
 			if collision.get_collider() is Enemy:
 				var enemy = collision.get_collider()
 				var distance = global_position.distance_to(enemy.global_position)
-				# print("DEBUG: Player colliding with enemy - Player pos: ", global_position, " Enemy pos: ", enemy.global_position, " Distance: ", distance)
 				
 				# Apply separation force if too close and not dashing
 				if distance < GameConstants.SEPARATION_DISTANCE_THRESHOLD and not is_dashing and not enemy.is_currently_dashing():
 					var separation_direction = (global_position - enemy.global_position).normalized()
 					var separation_force = separation_direction * GameConstants.PLAYER_SEPARATION_FORCE  # Push away gently
 					velocity += separation_force
-					# print("DEBUG: Applying separation force to player: ", separation_force)
 
 func handle_input():
 	# Don't handle input during dash or stun
@@ -342,13 +339,11 @@ func change_stance(new_stance: Stance):
 			start_parry_window()
 			# Show defense circles during combat stances
 			if defense_circles:
-				# print("DEBUG: Player changing to combat stance: ", Stance.keys()[new_stance], " - showing defense circles")
 				defense_circles.show_defense_circles()
 		else:
 			stop_parry_window()
 			# Hide defense circles when returning to neutral
 			if defense_circles:
-				# print("DEBUG: Player changing to NEUTRAL stance - hiding defense circles")
 				defense_circles.hide_defense_circles()
 		
 		# Play specific stance change sound
@@ -424,7 +419,8 @@ func show_damage_feedback(final_damage: int, original_damage: int):
 	# Enhanced damage feedback system with categorized responses
 	var category = get_damage_category(final_damage, original_damage)
 	
-	print("DEBUG: Damage feedback - Final:", final_damage, " Original:", original_damage, " Category:", category)
+	# Debug damage feedback (commented for performance)
+	# print("DEBUG: Damage feedback - Final:", final_damage, " Original:", original_damage, " Category:", category)
 	
 	# Apply visual feedback based on damage category
 	apply_color_feedback(category)

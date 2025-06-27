@@ -49,6 +49,9 @@ const ENEMY_MOVEMENT_THRESHOLD: float = 5.0
 const ENEMY_DASH_SPEED: float = 300.0
 const ENEMY_DASH_DURATION: float = 0.6
 const ENEMY_ATTACK_COOLDOWN: float = 1.2
+const MUTUAL_ATTACK_DAMAGE: int = 2
+const NEUTRAL_STANCE_DAMAGE: int = 1
+const WEAK_STANCE_DAMAGE: int = 2
 
 ## Health & Defense Constants
 const ENEMY_MAX_HEALTH: int = 5

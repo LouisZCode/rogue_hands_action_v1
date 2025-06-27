@@ -309,10 +309,7 @@ func apply_enemy_data():
 
 
 func _ready():
-	print("=== ENEMY INITIALIZATION DEBUG ===")
-	
-	# Debug: Check scene node structure
-	print("Sprite node: ", $Sprite if has_node("Sprite") else "MISSING!")
+	# Enemy initialization
 	
 	# Initialize audio manager
 	audio_manager = AudioManager.new()
@@ -323,7 +320,7 @@ func _ready():
 	
 	# Load enemy data from resource
 	if enemy_data:
-		print("Enemy_data found: ", enemy_data.enemy_name)
+		# Apply enemy data from resource
 		apply_enemy_data()
 	else:
 		print("No enemy_data found, loading defaults...")
@@ -333,10 +330,7 @@ func _ready():
 	
 	update_visual()
 	
-	# Final debug check
-	print("Final sprite reference: ", sprite)
-	print("Sprite visible: ", sprite.visible if sprite else "N/A")
-	print("=== ENEMY INITIALIZATION COMPLETE ===")
+	# Initialization complete
 	
 	# Setup vision casting (no signal connections needed for raycasting)
 	if vision_cast:
@@ -384,9 +378,7 @@ func _ready():
 		attack_timer_bar.visible = false
 	
 func _physics_process(delta):
-	# DEBUG: Show dash state
-	if is_dashing:
-		print("DEBUG _physics_process: Enemy is dashing - position: ", global_position, " dash_timer: ", dash_timer)
+	# Enemy dashing logic handled in handle_dash_movement()
 	
 	# Update AI state management FIRST (allows proper state transitions like WALKING → IDLE)
 	update_ai(delta)
@@ -414,22 +406,7 @@ func update_ai(delta):
 	# Note: All movement functions now enforce neutral stance restriction like player
 	match current_state:
 		AIState.IDLE:
-			# Smooth deceleration to stop
-			current_speed = move_toward(current_speed, 0.0, deceleration * delta)
-			if velocity.length() > 0 and current_speed > 0:
-				velocity = velocity.normalized() * current_speed
-			else:
-				velocity = Vector2.ZERO
-			
-			current_stance = Stance.NEUTRAL
-			# Hide any lingering indicators
-			hide_all_indicators()
-			# Check if idle time is over
-			if idle_timer <= 0:
-				print("DEBUG: IDLE TIMER EXPIRED - Returning to WALKING state")
-				current_state = AIState.WALKING
-				pick_new_walking_direction()
-				walking_timer = direction_change_interval
+			IdleState.update_idle_state(self, delta)
 		
 		AIState.WALKING:
 			# Random walking behavior when no player detected
@@ -551,7 +528,7 @@ func update_ai(delta):
 					lost_player_timer = lost_player_duration
 					if lost_indicator:
 						lost_indicator.visible = true
-					print("DEBUG: Retreat finished, showing confusion, timer set to: ", lost_player_timer)
+					# Retreat finished, showing confusion
 				
 		AIState.STUNNED:
 			velocity = Vector2.ZERO
@@ -574,14 +551,12 @@ func update_ai(delta):
 				if collision.get_collider() is Player:
 					var player = collision.get_collider()
 					var distance = global_position.distance_to(player.global_position)
-					# print("DEBUG: Enemy colliding with player - Enemy pos: ", global_position, " Player pos: ", player.global_position, " Distance: ", distance)
 					
 					# Apply separation force if too close and not dashing
 					if distance < GameConstants.SEPARATION_DISTANCE_THRESHOLD and not is_dashing and not player.is_currently_dashing():
 						var separation_direction = (global_position - player.global_position).normalized()
 						var separation_force = separation_direction * GameConstants.ENEMY_SEPARATION_FORCE  # Push away gently
 						velocity += separation_force
-						# print("DEBUG: Applying separation force to enemy: ", separation_force)
 
 func handle_walking_movement():
 	# Change direction periodically or if hitting boundaries
@@ -590,7 +565,7 @@ func handle_walking_movement():
 		if randf() < 0.4:
 			current_state = AIState.IDLE
 			idle_timer = idle_duration_min  # Fixed 3-second duration for consistent idle animation
-			print("DEBUG: ENEMY ENTERING IDLE STATE - Duration: ", idle_timer, " seconds")
+			# Enemy entering idle state
 			# Start deceleration when going idle
 			current_speed = 0.0
 			return
@@ -852,7 +827,7 @@ func attack_during_dash():
 		print("ERROR: No player found in scene!")
 	
 	print("Players already hit this dash: ", players_hit_this_dash.size())
-	print("=== END DEBUG ===")
+	# Attack collision processing complete
 	
 	for body in bodies:
 		if body is Player and not body in players_hit_this_dash:
@@ -910,46 +885,20 @@ func calculate_damage(attacker_stance: Stance, defender_stance: Stance) -> int:
 		return 5   # Lose damage
 
 func calculate_combat_damage(enemy_stance: Stance, player_stance, is_mutual_attack: bool = false) -> Dictionary:
-	# Returns: {damage: int, enemy_stunned: bool, player_defense_consumed: bool, weak_stance_damage: bool}
-	var result = {"damage": 0, "enemy_stunned": false, "player_defense_consumed": false, "weak_stance_damage": false}
+	# Use centralized combat calculator
+	var combat_result = CombatCalculator.resolve_combat(enemy_stance, player_stance, is_mutual_attack)
 	
-	var player_stance_int = int(player_stance)
-	var enemy_stance_int = int(enemy_stance)
+	# Convert CombatCalculator result format to legacy format for compatibility
+	var result = {
+		"damage": combat_result.damage,
+		"enemy_stunned": combat_result.attacker_stunned,
+		"player_defense_consumed": combat_result.defender_defense_consumed,
+		"weak_stance_damage": combat_result.weak_stance_damage
+	}
 	
-	# Mutual attack scenario (both dashing)
-	if is_mutual_attack:
-		if enemy_stance_int == player_stance_int:
-			# Tie - no damage to either
-			result.damage = 0
-			return result
-		elif (enemy_stance_int == 1 and player_stance_int == 3) or \
-			 (enemy_stance_int == 2 and player_stance_int == 1) or \
-			 (enemy_stance_int == 3 and player_stance_int == 2):
-			# Enemy wins - player gets stunned, enemy deals 2 damage
-			result.damage = 2
-			return result
-		else:
-			# Enemy loses - enemy gets stunned, no damage
-			result.damage = 0
-			result.enemy_stunned = true
-			return result
-	
-	# Attack vs Defense scenario (enemy attacking, player defending)
-	if player_stance_int == 0:  # vs Neutral
-		result.damage = 1
-	elif enemy_stance_int == player_stance_int:  # Same stance defense
-		result.damage = 0
-		result.player_defense_consumed = true
-	elif (enemy_stance_int == 1 and player_stance_int == 3) or \
-		 (enemy_stance_int == 2 and player_stance_int == 1) or \
-		 (enemy_stance_int == 3 and player_stance_int == 2):
-		# Enemy wins - V2: Defense points can absorb weak stance damage
-		result.damage = 2
-		result.weak_stance_damage = true  # Mark this as weak stance damage for special handling
-	else:
-		# Enemy loses - check if player is in parry window for perfect parry
-		result.damage = 0
-		# Check if player has parry window active for perfect parry
+	# Handle perfect parry logic (only for attack vs defense, not mutual attacks)
+	if not is_mutual_attack and result.damage == 0 and not result.player_defense_consumed:
+		# Check if player is in parry window for perfect parry
 		var player_ref = get_tree().get_first_node_in_group("player")
 		if player_ref and player_ref.has_method("is_in_parry_window") and player_ref.is_in_parry_window():
 			# Perfect parry! Stun enemy
@@ -966,51 +915,13 @@ func calculate_combat_damage(enemy_stance: Stance, player_stance, is_mutual_atta
 	return result
 
 func take_damage_from_player(player_stance, attack_position: Vector2, is_mutual_attack: bool = false):
-	var player_stance_int = int(player_stance)
-	var enemy_stance_int = int(current_stance)
+	# Use centralized combat calculator - player attacking enemy
+	var combat_result = CombatCalculator.resolve_combat(player_stance, current_stance, is_mutual_attack)
 	
-	var damage = 0
-	var result = ""
-	var player_stunned = false
-	var enemy_defense_consumed = false
-	
-	# Mutual attack scenario (both dashing)
-	if is_mutual_attack:
-		if player_stance_int == enemy_stance_int:
-			# Tie - no damage to either
-			damage = 0
-			result = "MUTUAL TIE - No damage"
-		elif (player_stance_int == 1 and enemy_stance_int == 3) or \
-			 (player_stance_int == 2 and enemy_stance_int == 1) or \
-			 (player_stance_int == 3 and enemy_stance_int == 2):
-			# Player wins - enemy takes 2 damage
-			damage = 2
-			result = "MUTUAL WIN - Player " + Player.Stance.keys()[player_stance] + " beats " + Stance.keys()[current_stance]
-		else:
-			# Player loses - player gets stunned, no damage to enemy
-			damage = 0
-			player_stunned = true
-			result = "MUTUAL LOSS - Player stunned by " + Stance.keys()[current_stance]
-	else:
-		# Attack vs Defense scenario (player attacking, enemy defending)
-		if enemy_stance_int == 0:  # Enemy in neutral
-			damage = 1
-			result = "vs NEUTRAL - 1 damage"
-		elif player_stance_int == enemy_stance_int:  # Same stance defense
-			damage = 0
-			enemy_defense_consumed = true
-			result = "BLOCKED - Enemy used defense point"
-		elif (player_stance_int == 1 and enemy_stance_int == 3) or \
-			 (player_stance_int == 2 and enemy_stance_int == 1) or \
-			 (player_stance_int == 3 and enemy_stance_int == 2):
-			# Player wins
-			damage = 2
-			result = "PLAYER WINS - " + Player.Stance.keys()[player_stance] + " beats " + Stance.keys()[current_stance]
-		else:
-			# Player loses (parry) - player gets stunned
-			damage = 0
-			player_stunned = true
-			result = "PARRY - Player stunned by " + Stance.keys()[current_stance]
+	var damage = combat_result.damage
+	var result = combat_result.result_description
+	var player_stunned = combat_result.attacker_stunned
+	var enemy_defense_consumed = combat_result.defender_defense_consumed
 	
 	# Handle defense point consumption
 	if enemy_defense_consumed:
@@ -1025,10 +936,12 @@ func take_damage_from_player(player_stance, attack_position: Vector2, is_mutual_
 	
 	# Handle player stun (enemy successfully parried!)
 	if player_stunned:
+		var player_ref = get_tree().get_first_node_in_group("player")
 		if player_ref and player_ref.has_method("apply_stun"):
 			player_ref.apply_stun()
 	
 	# Debug: Combat result calculated
+	print("Combat result: ", result)
 
 func spawn_damage_number(amount: int):
 	# Load and spawn damage number scene for enemy taking damage (blue numbers)
@@ -1188,7 +1101,7 @@ func update_animated_sprites():
 	# Update base sprite animation and track animation state
 	if sprite and sprite.sprite_frames:
 		# IMPORTANT: Respect idle timer protection (prevent interrupting 3-second idle animation)
-		if current_state == AIState.IDLE and idle_timer > 0:
+		if IdleState.should_maintain_idle_animation(self):
 			# Don't change animation during protected idle period
 			if sprite.animation != "idle":
 				sprite.play("idle")
@@ -1618,12 +1531,12 @@ func check_instant_detection():
 		if distance_to_player <= detection_radius:
 			# Player is within instant detection range
 			# IMPORTANT: Respect IDLE state protection (same logic as vision system)
-			if current_state == AIState.WALKING or (current_state == AIState.IDLE and idle_timer <= 0):
+			if IdleState.can_be_detected_during_idle(self):
 				if debug_enemy:
 					# Debug: Instant detection successful
 					pass
 				_handle_player_detected()
-			elif current_state == AIState.IDLE and idle_timer > 0:
+			elif IdleState.is_idle_protected(self):
 				# Debug: Instant detection blocked by idle protection
 				print("DEBUG: Instant detection blocked - IDLE protected (", idle_timer, " seconds remaining)")
 			elif debug_enemy:
@@ -1651,7 +1564,7 @@ func _handle_player_detected():
 	
 	# Check if we were in patrol states (trigger alert)
 	# IMPORTANT: Don't interrupt IDLE state until timer expires (protect 3-second idle animation)
-	var was_patrolling = current_state == AIState.WALKING or (current_state == AIState.IDLE and idle_timer <= 0)
+	var was_patrolling = IdleState.was_patrolling(self)
 	
 	if was_patrolling:
 		# Show alert first
@@ -1661,7 +1574,7 @@ func _handle_player_detected():
 		# Debug logging for Enemy 1
 		if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
 			print("AI STATE [%s]: %s → ALERT (alert_timer: %.1f)" % [enemy_data.enemy_name, "WALKING/IDLE", alert_timer])
-	elif current_state == AIState.IDLE and idle_timer > 0:
+	elif IdleState.is_idle_protected(self):
 		# Debug: Player detected but idle state protected
 		print("DEBUG: Player detected but IDLE state protected (", idle_timer, " seconds remaining)")
 	else:
