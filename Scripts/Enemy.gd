@@ -364,7 +364,7 @@ func _ready():
 	# fix_attack_area_size()
 	
 	# Initialize walking behavior
-	pick_new_walking_direction()
+	WalkingState.pick_new_walking_direction(self)
 	walking_timer = direction_change_interval
 	
 	# Ensure indicators start hidden
@@ -409,136 +409,36 @@ func update_ai(delta):
 			IdleState.update_idle_state(self, delta)
 		
 		AIState.WALKING:
-			# Random walking behavior when no player detected
-			current_stance = Stance.NEUTRAL
-			# Hide any lingering indicators
-			hide_all_indicators()
-			handle_walking_movement()
+			WalkingState.update_walking_state(self, delta)
 		
 		AIState.LOST_PLAYER:
 			# Stand still and look confused
 			velocity = Vector2.ZERO
 			current_stance = Stance.NEUTRAL
 			# Check if confusion time is over
-			if lost_player_timer <= 0:
-				# Hide lost indicator
-				if lost_indicator:
-					lost_indicator.visible = false
-					# print("DEBUG: Hiding lost indicator - timer expired")
-				# Reset detection range when giving up search
-				reset_detection_range()
-				# Return to walking
-				current_state = AIState.WALKING
-				pick_new_walking_direction()
-				walking_timer = direction_change_interval
-				# print("DEBUG: Lost player timer expired, returning to walking")
+			if WalkingState.should_return_to_walking_from_lost_player(self):
+				WalkingState.transition_from_lost_player_to_walking(self)
 		
 		AIState.ALERT:
-			# Stand still and show alert - brief pause before engaging
-			velocity = Vector2.ZERO
-			current_stance = Stance.NEUTRAL
-			# Check if alert time is over
-			if alert_timer <= 0:
-				# Hide alert indicator
-				if alert_indicator:
-					alert_indicator.visible = false
-				is_alerting = false
-				# Start observing player
-				current_state = AIState.OBSERVING
-				positioning_timer = randf_range(0.01, 0.05)  # Near-instant reaction
-				# Debug logging for Enemy 1
-				if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
-					print("AI STATE [%s]: ALERT → OBSERVING (timer: %.3f)" % [enemy_data.enemy_name, positioning_timer])
+			AlertState.update_alert_state(self, delta)
 			
 		AIState.OBSERVING:
-			# Stand still and observe player behavior
-			velocity = Vector2.ZERO
-			observe_player()
-			
-			# After observing, decide on positioning
-			if positioning_timer <= 0:
-				current_state = AIState.POSITIONING
-				positioning_timer = randf_range(0.1, 0.3)  # Quick positioning
-				# Debug logging for Enemy 1
-				if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
-					print("AI STATE [%s]: OBSERVING → POSITIONING (timer: %.3f)" % [enemy_data.enemy_name, positioning_timer])
+			ObservingState.update_observing_state(self, delta)
 			
 		AIState.POSITIONING:
-			# Move to tactical position while staying in neutral
-			if player_ref:
-				position_tactically()
-				
-				# If close enough and ready to attack, select stance
-				var distance = global_position.distance_to(player_ref.global_position)
-				if distance <= attack_range * 1.5 and attack_timer <= 0:
-					current_state = AIState.STANCE_SELECTION
-					stance_decision_timer = GameConstants.STANCE_DECISION_TIMER  # Time to decide stance
-					# Debug logging for Enemy 1
-					if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
-						# Debug: Entering stance selection
-						pass
-				elif enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
-					# Debug: Positioning, waiting for attack window
-					pass
+			PositioningState.update_positioning_state(self, delta)
 			
 		AIState.STANCE_SELECTION:
-			# Stop moving and select counter-stance
-			velocity = Vector2.ZERO
-			if stance_decision_timer <= 0:
-				select_tactical_stance()
-				# Start the 2-second delay before dash attack
-				stance_to_dash_timer = stance_to_dash_delay
-				current_state = AIState.ATTACKING
-				# Debug logging for Enemy 1
-				if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
-					# Debug: Starting attack with selected stance
-					pass
+			StanceSelectionState.update_stance_selection_state(self, delta)
 			
 		AIState.ATTACKING:
-			# Dash trajectory display removed for complete overhaul
-			# Once in attacking state, commit to the attack regardless of player position
-			if current_stance != Stance.NEUTRAL:
-				# Only attack after 2-second delay and cooldown is ready
-				if attack_timer <= 0 and stance_to_dash_timer <= 0:
-					perform_dash_attack()
-			else:
-				current_state = AIState.RETREATING
-				retreat_timer = GameConstants.RETREAT_TIMER
-				# Hide attack timer when exiting attacking state
-				if attack_timer_bar:
-					attack_timer_bar.visible = false
-				# Dash preview hiding removed for complete overhaul
+			AttackingState.update_attacking_state(self, delta)
 				
 		AIState.RETREATING:
-			# Dash preview hiding removed for complete overhaul
-			# Move away and return to neutral
-			if player_ref:
-				retreat_from_player()
-				
-			if retreat_timer <= 0:
-				current_stance = Stance.NEUTRAL
-				update_visual()
-				# Return to walking if no player, otherwise keep observing
-				if player_ref:
-					current_state = AIState.OBSERVING
-					positioning_timer = randf_range(0.5, 1.5)
-				else:
-					# Show confusion after retreat before going back to patrol
-					current_state = AIState.LOST_PLAYER
-					lost_player_timer = lost_player_duration
-					if lost_indicator:
-						lost_indicator.visible = true
-					# Retreat finished, showing confusion
+			RetreatingState.update_retreating_state(self, delta)
 				
 		AIState.STUNNED:
-			velocity = Vector2.ZERO
-			# Check if stun timer is done
-			if stun_timer <= 0:
-				current_state = AIState.RETREATING
-				retreat_timer = GameConstants.RETREAT_TIMER
-				# Hide stun indicator when stun ends
-				if stun_indicator:
-					stun_indicator.visible = false
+			StunnedState.update_stunned_state(self, delta)
 	
 	# Movement is now handled in handle_dash_movement() during dashes
 	if not is_dashing:
@@ -558,56 +458,6 @@ func update_ai(delta):
 						var separation_force = separation_direction * GameConstants.ENEMY_SEPARATION_FORCE  # Push away gently
 						velocity += separation_force
 
-func handle_walking_movement():
-	# Change direction periodically or if hitting boundaries
-	if walking_timer <= 0 or is_near_boundary():
-		# 40% chance to go idle instead of continuing to walk
-		if randf() < 0.4:
-			current_state = AIState.IDLE
-			idle_timer = idle_duration_min  # Fixed 3-second duration for consistent idle animation
-			# Enemy entering idle state
-			# Start deceleration when going idle
-			current_speed = 0.0
-			return
-		else:
-			pick_new_walking_direction()
-			walking_timer = direction_change_interval + randf_range(-0.5, 0.5)  # Add some randomness
-	
-	# Smooth movement with acceleration/deceleration and integrated rotation
-	if walking_direction.length() > 0.1:
-		# Accelerate toward walking speed
-		var target_speed = walking_speed
-		current_speed = move_toward(current_speed, target_speed, acceleration * get_process_delta_time())
-		var new_velocity = walking_direction.normalized() * current_speed
-		apply_movement_with_rotation(new_velocity)
-		
-		# Update facing direction gradually based on movement
-		if velocity.length() > 0.1:
-			var target_facing = velocity.normalized()
-			facing_direction = facing_direction.lerp(target_facing, 3.0 * get_process_delta_time()).normalized()
-	else:
-		# Decelerate when no direction
-		current_speed = move_toward(current_speed, 0.0, deceleration * get_process_delta_time())
-		if velocity.length() > 0 and current_speed > 0:
-			apply_movement_with_rotation(velocity.normalized() * current_speed)
-		else:
-			apply_movement_with_rotation(Vector2.ZERO)
-
-func pick_new_walking_direction():
-	# Pick a random direction
-	var angle = randf() * 2 * PI
-	walking_direction = Vector2(cos(angle), sin(angle))
-	# Update facing direction immediately
-	facing_direction = walking_direction.normalized()
-	
-	# Make sure we're not walking directly into a wall
-	var test_position = global_position + walking_direction * 100
-	if is_position_near_boundary(test_position):
-		# Pick direction towards center instead
-		walking_direction = (Vector2.ZERO - global_position).normalized()
-		# Add some randomness to avoid getting stuck
-		var random_offset = Vector2(randf_range(-0.5, 0.5), randf_range(-0.5, 0.5))
-		walking_direction = (walking_direction + random_offset).normalized()
 
 func is_near_boundary() -> bool:
 	return is_position_near_boundary(global_position)
@@ -618,58 +468,6 @@ func is_position_near_boundary(pos: Vector2) -> bool:
 	return pos.x < GameConstants.LEVEL_BOUNDARY_LEFT + margin or pos.x > GameConstants.LEVEL_BOUNDARY_RIGHT - margin or pos.y < GameConstants.LEVEL_BOUNDARY_TOP + margin or pos.y > GameConstants.LEVEL_BOUNDARY_BOTTOM - margin
 
 # New AI methods for tactical combat
-func observe_player():
-	if player_ref:
-		# Track player's stance changes
-		if player_ref.current_stance != last_player_stance:
-			last_player_stance = player_ref.current_stance
-			# Debug: Player stance change observed
-
-func position_tactically():
-	if player_ref:
-		# Only move if in neutral stance (like player)
-		if current_stance != Stance.NEUTRAL:
-			apply_movement_with_rotation(Vector2.ZERO)
-			return
-			
-		var distance = global_position.distance_to(player_ref.global_position)
-		var direction = (player_ref.global_position - global_position).normalized()
-		
-		# Try to maintain optimal distance - close enough to attack, far enough to retreat
-		if distance > attack_range * 1.2:
-			# Move closer with integrated rotation
-			apply_movement_with_rotation(direction * speed)
-		elif distance < attack_range * 0.8:
-			# Move away to optimal distance with integrated rotation
-			apply_movement_with_rotation(-direction * speed * 0.7)
-		else:
-			# Circle around player to find good attack angle with integrated rotation
-			var perpendicular = Vector2(-direction.y, direction.x)
-			apply_movement_with_rotation(perpendicular * speed * 0.5)
-
-func select_tactical_stance():
-	if player_ref:
-		var player_stance = player_ref.current_stance
-		
-		# Store the player's position at the moment of stance selection
-		target_attack_position = player_ref.global_position
-		
-		print("ENEMY: Stance selection - Enemy position: ", global_position, " - Target position: ", target_attack_position)
-		
-		# Debug mode: Always use Rock for testing
-		if debug_rock_only:
-			current_stance = Stance.ROCK
-			update_visual()
-			print("ENEMY: Selected ROCK (debug mode) vs player's ", Player.Stance.keys()[player_stance])
-			print("ENEMY: Attack trajectory from ", global_position, " to ", target_attack_position)
-			return
-		
-		# Stance selection based on CSV probabilities
-		current_stance = select_weighted_stance()
-		
-		update_visual()
-		# Debug: Stance selection complete
-		# Debug: Target position locked
 
 func chase_player():
 	if player_ref:
@@ -681,24 +479,10 @@ func chase_player():
 		var direction = (player_ref.global_position - global_position).normalized()
 		apply_movement_with_rotation(direction * speed)
 
-func retreat_from_player():
-	if player_ref:
-		# Only move if in neutral stance (like player)
-		if current_stance != Stance.NEUTRAL:
-			apply_movement_with_rotation(Vector2.ZERO)
-			return
-			
-		var direction = (global_position - player_ref.global_position).normalized()
-		apply_movement_with_rotation(direction * speed * 0.8)
 
 func handle_dash_movement(delta):
 	# No dash movement allowed when stunned
-	if current_state == AIState.STUNNED:
-		if is_dashing:
-			# Cancel ongoing dash when stunned
-			is_dashing = false
-			dash_timer = 0.0
-			velocity = Vector2.ZERO
+	if StunnedState.prevent_dash_movement_when_stunned(self):
 		return
 	
 	if is_dashing:
@@ -725,153 +509,12 @@ func handle_dash_movement(delta):
 			for i in get_slide_collision_count():
 				var collision = get_slide_collision(i)
 				if collision.get_collider() is Player:
-					# print("DEBUG: Enemy DASH colliding with player - Enemy pos: ", global_position, " Player pos: ", collision.get_collider().global_position, " Distance: ", global_position.distance_to(collision.get_collider().global_position))
 					pass
 			
 		# Check for player hits during dash
-		# print("DEBUG: Calling attack_during_dash() - Enemy at: ", global_position)
-		attack_during_dash()
+		AttackingState.attack_during_dash(self)
 
-func perform_dash_attack():
-	if current_stance != Stance.NEUTRAL:
-		# Calculate attack direction using stored target position
-		var direction = (target_attack_position - global_position).normalized()
-		
-		# Start dash attack
-		is_dashing = true
-		dash_direction = direction
-		dash_timer = dash_duration
-		attack_timer = attack_cooldown
-		
-		# Clear the list of players hit this dash
-		players_hit_this_dash.clear()
-		
-		# Visual feedback
-		var dash_color = stance_colors[current_stance].lerp(Color.WHITE, 0.5)
-		sprite.modulate = dash_color
-		
-		# DEBUG: Make enemy glow bright red during attack for visibility
-		if debug_attack_range:
-			sprite.modulate = Color.RED
-			debug_draw_attack_area()
-			queue_redraw()
-		
-		# Reset color after dash
-		var tween = create_tween()
-		tween.tween_interval(dash_duration)
-		tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
-		
-		# Emit attack signal
-		enemy_attack.emit(current_stance, global_position)
-		# Debug: Dash attack initiated
 
-func attack_during_dash():
-	# DEBUG: Add comprehensive logging
-	# print("=== ENEMY ATTACK_DURING_DASH DEBUG ===")
-	# print("Enemy position: ", global_position)
-	# print("Enemy is_dashing: ", is_dashing)
-	# print("Enemy current_stance: ", Stance.keys()[current_stance])
-	
-	# Check for player hits using the actual attack area collision
-	var bodies = attack_area.get_overlapping_bodies()
-	# print("Bodies found in attack_area: ", bodies.size())
-	
-	if bodies.size() == 0:
-		# print("DEBUG: NO BODIES FOUND - Attack area empty!")
-		# Additional debug: Check if attack_area exists and is configured
-		if not attack_area:
-			# print("ERROR: attack_area is null!")
-			pass
-		else:
-			# print("Attack area exists, checking collision shape...")
-			var attack_collision = attack_area.get_child(0) as CollisionShape2D
-			if not attack_collision:
-				# print("ERROR: No collision shape found in attack_area!")
-				pass
-			elif not attack_collision.shape:
-				# print("ERROR: Collision shape is null!")
-				pass
-			else:
-				var shape = attack_collision.shape as CircleShape2D
-				if shape:
-					var effective_radius = shape.radius * attack_collision.scale.x
-					# print("Attack collision shape radius: ", shape.radius)
-					# print("Attack collision scale: ", attack_collision.scale)
-					# print("Effective attack radius: ", effective_radius, "px")
-					# print("Attack collision position: ", attack_collision.global_position)
-					pass
-				else:
-					# print("ERROR: Shape is not CircleShape2D!")
-					pass
-	else:
-		# print("Bodies found:")
-		for i in range(bodies.size()):
-			var body = bodies[i]
-			# print("  [", i, "] ", body.name, " (", body.get_class(), ") at ", body.global_position)
-			# print("      Distance to enemy: ", global_position.distance_to(body.global_position))
-			pass
-	
-	# Check if player exists in scene
-	var player_ref = get_tree().get_first_node_in_group("player")
-	if player_ref:
-		var distance_to_player = global_position.distance_to(player_ref.global_position)
-		print("Player found in scene at: ", player_ref.global_position)
-		print("Distance to player: ", distance_to_player, "px")
-		print("Player collision layers: ", player_ref.collision_layer)
-		print("Player collision mask: ", player_ref.collision_mask)
-		print("Enemy collision layers: ", collision_layer)
-		print("Enemy collision mask: ", collision_mask)
-		print("Attack area collision layers: ", attack_area.collision_layer)
-		print("Attack area collision mask: ", attack_area.collision_mask)
-	else:
-		print("ERROR: No player found in scene!")
-	
-	print("Players already hit this dash: ", players_hit_this_dash.size())
-	# Attack collision processing complete
-	
-	for body in bodies:
-		if body is Player and not body in players_hit_this_dash:
-			# Detect combat scenario: mutual attack or attack vs defense
-			var is_mutual_attack = detect_mutual_attack_with_body(body)
-			# Calculate combat result based on stance matchup and scenario
-			var combat_result = calculate_combat_damage(current_stance, body.current_stance, is_mutual_attack)
-			
-			# Handle defense point consumption
-			if combat_result.player_defense_consumed:
-				if body.has_method("consume_defense_point"):
-					if body.consume_defense_point():
-						print("Player blocked with defense point!")
-						# Play regular block sound (successful block outside parry window)
-						if body.audio_manager and body.walking_audio:
-							body.audio_manager.play_regular_block_sfx(body.walking_audio)
-					else:
-						# No defense points left, take damage instead (reduced for same-stance balance)
-						combat_result.damage = 1
-						body.take_damage(combat_result.damage)
-				else:
-					# Fallback if method doesn't exist
-					body.take_damage(combat_result.damage)
-			elif combat_result.damage > 0:
-				# V2: Handle weak stance damage absorption
-				if combat_result.weak_stance_damage and body.has_method("consume_multiple_defense_points"):
-					# Try to absorb weak stance damage with defense points
-					var absorbed_damage = body.consume_multiple_defense_points(combat_result.damage)
-					var remaining_damage = combat_result.damage - absorbed_damage
-					if absorbed_damage > 0:
-						print("Defense points absorbed ", absorbed_damage, " damage from weak stance!")
-					if remaining_damage > 0:
-						body.take_damage(remaining_damage)
-				else:
-					# Regular damage application
-					body.take_damage(combat_result.damage)
-			
-			# Handle enemy stun (parry success!)
-			if combat_result.enemy_stunned:
-				apply_stun()
-			
-			# Add player to the list of already hit players
-			players_hit_this_dash.append(body)
-			print("Enemy attack result: ", combat_result.damage, " damage (mutual: ", is_mutual_attack, ")")
 
 func calculate_damage(attacker_stance: Stance, defender_stance: Stance) -> int:
 	# Rock-Paper-Scissors logic
@@ -1011,7 +654,7 @@ func update_timers(delta):
 	debug_timer += delta
 	if debug_timer >= debug_interval:
 		debug_timer = 0.0
-		print_enemy_status_debug()
+		# Debug output removed for performance
 	
 	# Update attack cooldown in all states for responsive combat
 	if attack_timer > 0:
@@ -1070,16 +713,13 @@ func update_timers(delta):
 		lost_player_timer -= delta
 		if current_state == AIState.LOST_PLAYER:
 			pass
-			#print("DEBUG: Lost player timer: ", lost_player_timer)
 	
 	# Update alert timer
 	if alert_timer > 0:
 		alert_timer -= delta
 
 func update_visual():
-	# Debug: Show current state and velocity
-	if velocity.length() > 1.0:  # Only when moving
-		print("DEBUG: update_visual - State: ", AIState.keys()[current_state], " Velocity: ", velocity.length(), " Animation: ", current_animation_state)
+	# Debug output removed for performance
 	
 	# Handle stance-based sprite display only during stance selection and pre-attack phase
 	if current_stance != Stance.NEUTRAL and current_state == AIState.STANCE_SELECTION:
@@ -1201,21 +841,8 @@ func get_shortest_angle_difference(current_angle: float, target_angle: float) ->
 	return diff
 
 func print_enemy_status_debug():
-	# Controlled debug output every 1.0 seconds (only when moving or in combat states)
-	var should_debug = velocity.length() > 1.0 or current_state != AIState.WALKING or current_state == AIState.IDLE
-	if should_debug:
-		var rotation_value = sprite.rotation_degrees if sprite else 0.0
-		print("=== ENEMY STATUS DEBUG ===")
-		print("State: ", AIState.keys()[current_state])
-		print("Position: ", global_position)
-		print("Velocity: ", velocity, " (magnitude: ", velocity.length(), ")")
-		print("Current Rotation: ", rotation_value, "°")
-		
-		# Special debug for IDLE state
-		if current_state == AIState.IDLE:
-			print("IDLE Timer Remaining: ", idle_timer, " seconds")
-		
-		print("==========================")
+	# Debug output optimized for performance
+	pass
 
 func update_health_bar():
 	var health_percent = float(current_health) / float(max_health) * 100.0
@@ -1568,9 +1195,7 @@ func _handle_player_detected():
 	
 	if was_patrolling:
 		# Show alert first
-		current_state = AIState.ALERT
-		is_alerting = true
-		alert_timer = alert_duration
+		AlertState.start_alert_state(self, alert_duration)
 		# Debug logging for Enemy 1
 		if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
 			print("AI STATE [%s]: %s → ALERT (alert_timer: %.1f)" % [enemy_data.enemy_name, "WALKING/IDLE", alert_timer])
@@ -1584,9 +1209,7 @@ func _handle_player_detected():
 		
 		# Force into combat mode even if not patrolling (fix for stuck enemies)
 		if current_state not in [AIState.ALERT, AIState.OBSERVING, AIState.POSITIONING, AIState.STANCE_SELECTION, AIState.ATTACKING]:
-			current_state = AIState.ALERT
-			is_alerting = true
-			alert_timer = alert_duration
+			AlertState.start_alert_state(self, alert_duration)
 			if enemy_data and enemy_data.enemy_name == "Basic Balanced Enemy":
 				print("AI STATE [%s]: FORCED → ALERT (fixing stuck state)" % [enemy_data.enemy_name])
 		if alert_indicator:
@@ -1647,39 +1270,3 @@ func detect_mutual_attack_with_body(body) -> bool:
 func _on_attack_area_body_entered(body):
 	# Attack area entry is now handled in the tactical AI states
 	pass
-
-func select_weighted_stance() -> Stance:
-	# Select stance based on CSV probability weights
-	if not enemy_data:
-		# Fallback to random if no data
-		var stances = [Stance.NEUTRAL, Stance.ROCK, Stance.PAPER, Stance.SCISSORS]
-		return stances[randi() % stances.size()]
-	
-	# Get probabilities from enemy data
-	var total_weight = enemy_data.neutral_probability + enemy_data.rock_probability + enemy_data.paper_probability + enemy_data.scissors_probability
-	
-	if total_weight <= 0:
-		# Fallback to balanced if all weights are 0
-		return Stance.ROCK
-	
-	# Generate random number between 0 and total weight
-	var random_value = randf() * total_weight
-	var cumulative_weight = 0.0
-	
-	# Check neutral stance
-	cumulative_weight += enemy_data.neutral_probability
-	if random_value <= cumulative_weight:
-		return Stance.NEUTRAL
-	
-	# Check rock stance
-	cumulative_weight += enemy_data.rock_probability
-	if random_value <= cumulative_weight:
-		return Stance.ROCK
-	
-	# Check paper stance
-	cumulative_weight += enemy_data.paper_probability
-	if random_value <= cumulative_weight:
-		return Stance.PAPER
-	
-	# Default to scissors (or if rounding errors)
-	return Stance.SCISSORS
